@@ -1,10 +1,11 @@
 import { useEffect,useState } from 'react'
-import { BarChart3,CalendarDays,CirclePlus,Megaphone,MoreHorizontal,Link2,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon } from 'lucide-react'
-import { api,type Workspace,type Pending,type Channel,type Member,type Invite } from './api'
+import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText } from 'lucide-react'
+import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post } from './api'
 
-const APP_VERSION = 'v0.6.0'
+const APP_VERSION = 'v0.7.0'
 type Tab = 'overview'|'calendar'|'create'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
+const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
 
 function buzz(){try{window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')}catch{}}
 
@@ -20,15 +21,20 @@ function errorHint(msg:string):string{
 export default function App(){
  const [tab,setTab]=useState<Tab>('overview')
  const [spaces,setSpaces]=useState<Workspace[]>([]),[active,setActive]=useState<Workspace|null>(null),[pending,setPending]=useState<Pending[]>([]),[channels,setChannels]=useState<Channel[]>([]),[members,setMembers]=useState<Member[]>([]),[invite,setInvite]=useState<Invite|null>(null),[copied,setCopied]=useState(false),[joined,setJoined]=useState<{workspace_name:string;role:string}|null>(null),[name,setName]=useState('Моё агентство'),[error,setError]=useState(''),[loading,setLoading]=useState(true)
+ const [posts,setPosts]=useState<Post[]>([]),[newTitle,setNewTitle]=useState(''),[newText,setNewText]=useState(''),[draftChannel,setDraftChannel]=useState<number|null>(null),[busy,setBusy]=useState(false)
  const hasInitData=!!(window.Telegram?.WebApp?.initData)
- async function load(){setLoading(true);setError('');try{const s=await api.workspaces();setSpaces(s);const a=active&&s.some(x=>x.id===active.id)?active:s[0]||null;setActive(a);const [p,c,m]=await Promise.all([api.pending(),a?api.channels(a.id):Promise.resolve([]),a?api.members(a.id):Promise.resolve([])]);setPending(p);setChannels(c);setMembers(m);setInvite(null)}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки')}finally{setLoading(false)}}
+ async function load(){setLoading(true);setError('');try{const s=await api.workspaces();setSpaces(s);const a=active&&s.some(x=>x.id===active.id)?active:s[0]||null;setActive(a);const [p,c,m,po]=await Promise.all([api.pending(),a?api.channels(a.id):Promise.resolve([]),a?api.members(a.id):Promise.resolve([]),a?api.posts(a.id):Promise.resolve([])]);setPending(p);setChannels(c);setMembers(m);setPosts(po)}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки')}finally{setLoading(false)}}
  useEffect(()=>{const sp=window.Telegram?.WebApp?.initDataUnsafe?.start_param||'';if(sp.startsWith('invite_')){api.acceptInvite(sp.slice('invite_'.length)).then(res=>{setJoined({workspace_name:res.workspace_name,role:res.role});return load()}).catch(e=>{setError(e instanceof Error?e.message:'Ошибка принятия приглашения');return load()})}else{load()}},[])
  async function create(){buzz();try{await api.createWorkspace(name);setName('Моё агентство');await load();setTab('overview')}catch(e){setError(e instanceof Error?e.message:'Ошибка')}}
  async function connect(id:number){buzz();if(!active)return;try{await api.connect(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка подключения')}}
  async function makeInvite(){buzz();if(!active)return;setError('');try{const iv=await api.createInvite(active.id,'editor');setInvite(iv);setCopied(false)}catch(e){setError(e instanceof Error?e.message:'Ошибка создания приглашения')}}
  async function copyInvite(){buzz();if(!invite)return;try{await navigator.clipboard.writeText(invite.token);setCopied(true)}catch{setCopied(false)}}
  function goSection(id:string){buzz();setTab('overview');setTimeout(()=>{document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'})},80)}
+ async function createDraft(){buzz();if(!active)return;setBusy(true);setError('');try{await api.createPost(active.id,{title:newTitle,text:newText,channel_id:draftChannel});setNewTitle('');setNewText('');setDraftChannel(null);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания черновика')}finally{setBusy(false)}}
+ async function actPost(id:number,kind:'submit'|'approve'|'changes'|'schedule'|'now'|'cancel'){buzz();if(!active)return;setBusy(true);setError('');try{const w=active.id;if(kind==='submit')await api.submitPost(w,id);if(kind==='approve')await api.approvePost(w,id);if(kind==='changes')await api.requestChanges(w,id);if(kind==='schedule')await api.schedulePost(w,id,new Date(Date.now()+3600000).toISOString());if(kind==='now')await api.publishNow(w,id);if(kind==='cancel')await api.cancelPost(w,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка операции')}finally{setBusy(false)}}
  const canManage=active?.role==='owner'||active?.role==='admin'
+ const canReview=active?.role==='owner'||active?.role==='admin'||active?.role==='editor'
+ const canSchedule=canReview||active?.role==='ad_manager'
  const hint=error?errorHint(error):''
  return <div className="app"><header><div><span className="eyebrow">РАБОЧЕЕ ПРОСТРАНСТВО</span><h1>ChannelDesk</h1></div><button className="workspace" onClick={()=>{buzz();load()}} title="Обновить"><RefreshCw size={15}/></button></header><main>
   {!hasInitData&&<section className="panel warn"><strong>⚠ Приложение работает только внутри Telegram</strong><p>Откройте его через бота <code>@channel_desk_bot</code> (кнопка «Открыть ChannelDesk») — так Telegram передаст авторизацию.</p></section>}
@@ -39,7 +45,7 @@ export default function App(){
    {!active&&!loading?<section className="hero"><p>Создайте рабочее пространство агентства.</p><input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white',marginBottom:12}}/><button onClick={create}><CirclePlus size={19}/> Создать</button></section>:<>
     <section className="hero"><span className="eyebrow">{active?.role}</span><p style={{marginTop:8}}>{active?.name}</p><div>{spaces.length>1&&<select value={active?.id} onChange={e=>{buzz();setActive(spaces.find(x=>x.id===Number(e.target.value))||null)}}>{spaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select>}</div></section>
     {pending.length>0&&<section className="panel" style={{marginTop:16}}><div className="panel-title"><h2>Обнаруженные каналы</h2><Radio size={20}/></div>{pending.map(p=><article key={p.id} style={{padding:'14px 0',borderBottom:'1px solid #252b36'}}><strong>{p.title}</strong><p style={{color:'#8d96a8',fontSize:12}}>{p.bot_permissions.can_post_messages?'Публикация разрешена':'Нет права публикации'}</p><button onClick={()=>connect(p.id)} disabled={!p.bot_permissions.can_post_messages}>Подключить</button></article>)}</section>}
-    <section className="stats"><article><span>Каналы</span><strong>{channels.length}</strong></article><article><span>Запланировано</span><strong>0</strong></article><article><span>На согласовании</span><strong>0</strong></article><article><span>Доход</span><strong>0 ₽</strong></article></section>
+    <section className="stats"><article><span>Каналы</span><strong>{channels.length}</strong></article><article><span>Запланировано</span><strong>{posts.filter(p=>p.status==='scheduled').length}</strong></article><article><span>На согласовании</span><strong>{posts.filter(p=>p.status==='review').length}</strong></article><article><span>Доход</span><strong>0 ₽</strong></article></section>
     <section id="channels-section" className="panel"><div className="panel-title"><h2>Каналы</h2><CalendarDays size={20}/></div>{channels.length?channels.map(c=><div key={c.id} style={{padding:'15px 0',borderBottom:'1px solid #252b36'}}><strong>{c.title}</strong><div style={{color:'#72d99f',fontSize:12}}>● подключён</div></div>):<div className="empty"><div className="empty-icon"><Megaphone/></div><h3>Каналов пока нет</h3><p>Добавьте бота администратором канала и обновите экран.</p></div>}</section>
     <section id="team-section" className="panel" style={{marginTop:16}}><div className="panel-title"><h2>Команда</h2><Users size={20}/></div>
      {canManage&&<button className="invite-btn" onClick={makeInvite}><Link2 size={15}/> Создать приглашение (редактор)</button>}
@@ -49,11 +55,45 @@ export default function App(){
    </>}
   </>}
 
-  {tab==='calendar'&&<section className="panel"><div className="panel-title"><h2>Контент-календарь</h2><CalendarDays size={20}/></div><div className="empty"><div className="empty-icon"><Clock/></div><h3>Календарь появится на Этапе B</h3><p>Здесь будут публикации команды по датам, статусам и каналам.</p></div></section>}
+  {tab==='calendar'&&<>
+   {!active?<section className="panel"><div className="empty"><div className="empty-icon"><CalendarDays/></div><h3>Создайте рабочее пространство</h3><p>Календарь публикаций появится после создания пространства и подключения канала.</p></div></section>:<>
+    <section className="panel"><div className="panel-title"><h2>Новый черновик</h2><FileText size={20}/></div>
+     <input placeholder="Заголовок" value={newTitle} onChange={e=>setNewTitle(e.target.value)} style={{width:'100%',padding:12,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white',margin:'12px 0 10px'}}/>
+     <textarea placeholder="Текст (поддерживается Telegram HTML: <b>, <i>, <a href=...>)" value={newText} onChange={e=>setNewText(e.target.value)} rows={4} style={{width:'100%',padding:12,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white',resize:'vertical'}}/>
+     <div style={{display:'flex',gap:10,alignItems:'center',margin:'12px 0'}}>
+      <select value={draftChannel??''} onChange={e=>setDraftChannel(e.target.value?Number(e.target.value):null)} style={{flex:1,padding:12,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white'}}>
+       <option value="">— без канала —</option>
+       {channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}
+      </select>
+      <button onClick={createDraft} disabled={busy||!newTitle.trim()}><CirclePlus size={18}/> Черновик</button>
+     </div>
+    </section>
+    <section className="panel" style={{marginTop:14}}><div className="panel-title"><h2>Публикации</h2><Clock size={20}/></div>
+     {posts.length===0?<div className="empty"><p>Пока нет публикаций. Создайте первый черновик выше.</p></div>:posts.map(p=><article key={p.id} style={{padding:'14px 0',borderBottom:'1px solid #252b36'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
+       <strong style={{fontSize:14}}>{p.title||'(без заголовка)'}</strong>
+       <span className={"status status-"+p.status}>{STATUS_LABEL[p.status]||p.status}</span>
+      </div>
+      <p style={{color:'#8d96a8',fontSize:12,margin:'6px 0 0'}}>
+       {p.channel_title||'без канала'}
+       {p.scheduled_at?` · ${new Date(p.scheduled_at).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}`:''}
+       {p.author_username?` · @${p.author_username}`:''}
+      </p>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
+       {['draft','in_progress','idea','changes_requested'].includes(p.status)&&<button onClick={()=>actPost(p.id,'submit')} disabled={busy}><Send size={14}/> На согласование</button>}
+       {p.status==='review'&&canReview&&<><button onClick={()=>actPost(p.id,'approve')} disabled={busy}>✓ Одобрить</button><button onClick={()=>actPost(p.id,'changes')} disabled={busy}>Правки</button></>}
+       {p.status==='approved'&&canSchedule&&<><button onClick={()=>actPost(p.id,'schedule')} disabled={busy}>⏱ +1 час</button><button onClick={()=>actPost(p.id,'now')} disabled={busy}>Опубликовать сейчас</button></>}
+       {p.status==='scheduled'&&canSchedule&&<button onClick={()=>actPost(p.id,'now')} disabled={busy}>Опубликовать сейчас</button>}
+       {!['published','cancelled','publishing'].includes(p.status)&&<button onClick={()=>actPost(p.id,'cancel')} disabled={busy} style={{opacity:.7}}>Отменить</button>}
+      </div>
+     </article>)}
+    </section>
+   </>}
+  </>}
 
   {tab==='create'&&<section className="panel"><div className="panel-title"><h2>Создать</h2><CirclePlus size={20}/></div>
    {active?<>
-    <button className="invite-btn" disabled style={{opacity:.5}}><CirclePlus size={15}/> Новая публикация (Этап B)</button>
+    <button className="invite-btn" onClick={()=>{buzz();setTab('calendar')}}><FileText size={15}/> Новая публикация</button>
     <button className="invite-btn" disabled style={{opacity:.5}}><Megaphone size={15}/> Рекламный слот (Этап C)</button>
     <div style={{margin:'18px 0 10px'}}><strong>Новое рабочее пространство</strong></div>
     <input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white',marginBottom:12}}/>

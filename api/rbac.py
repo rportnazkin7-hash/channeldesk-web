@@ -17,6 +17,14 @@ MATRIX: dict[str, frozenset[str]] = {
     'channel.connect': frozenset({'owner','admin'}),
 
     'audit.view': frozenset({'owner','admin','analyst'}),
+
+    # Публикации (Этап B)
+    'post.view': frozenset({'owner','admin','editor','author','designer','ad_manager','analyst','viewer'}),
+    'post.create': frozenset({'owner','admin','editor','author'}),
+    'post.edit': frozenset({'owner','admin','editor','author'}),
+    'post.review': frozenset({'owner','admin','editor'}),
+    'post.schedule': frozenset({'owner','admin','editor','ad_manager'}),
+    'post.publish': frozenset({'owner','admin','editor'}),
 }
 
 

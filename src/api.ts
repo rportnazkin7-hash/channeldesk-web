@@ -17,6 +17,7 @@ export type Channel={id:number;title:string;username:string|null;is_connected:bo
 export type Member={id:number;role:string;status:string;channel_scope:number[]|null;telegram_id:number;username:string|null;first_name:string|null;last_name:string|null}
 export type Invite={id:number;role:string;max_uses:number|null;expires_at:string|null;token:string}
 export type AuditEntry={id:number;action:string;entity_type:string;entity_id:number|null;created_at:string}
+export type Post={id:number;title:string;text:string;status:string;scheduled_at:string|null;channel_id:number|null;channel_title:string|null;author_username:string|null;approval_required:boolean;publish_key:string|null;telegram_message_id:number|null;created_at:string}
 export const api={
  workspaces:()=>req<Workspace[]>('/api/workspaces'),
  createWorkspace:(name:string)=>req<Workspace>('/api/workspaces',{method:'POST',body:JSON.stringify({name})}),
@@ -27,4 +28,12 @@ export const api={
  createInvite:(wid:number,role='viewer')=>req<Invite>(`/api/workspaces/${wid}/invites`,{method:'POST',body:JSON.stringify({role})}),
  acceptInvite:(token:string)=>req<{workspace_id:number;workspace_name:string;role:string}>(`/api/invites/accept`,{method:'POST',body:JSON.stringify({token})}),
  audit:(wid:number)=>req<AuditEntry[]>(`/api/workspaces/${wid}/audit`),
+ posts:(wid:number)=>req<Post[]>(`/api/workspaces/${wid}/posts`),
+ createPost:(wid:number,p:{title:string;text:string;channel_id:number|null})=>req<Post>(`/api/workspaces/${wid}/posts`,{method:'POST',body:JSON.stringify(p)}),
+ submitPost:(wid:number,id:number)=>req<Post>(`/api/workspaces/${wid}/posts/${id}/submit`,{method:'POST'}),
+ approvePost:(wid:number,id:number)=>req<Post>(`/api/workspaces/${wid}/posts/${id}/approve`,{method:'POST'}),
+ requestChanges:(wid:number,id:number)=>req<Post>(`/api/workspaces/${wid}/posts/${id}/request-changes`,{method:'POST'}),
+ schedulePost:(wid:number,id:number,at:string)=>req<Post>(`/api/workspaces/${wid}/posts/${id}/schedule`,{method:'POST',body:JSON.stringify({scheduled_at:at})}),
+ publishNow:(wid:number,id:number)=>req<Post>(`/api/workspaces/${wid}/posts/${id}/publish-now`,{method:'POST'}),
+ cancelPost:(wid:number,id:number)=>req<Post>(`/api/workspaces/${wid}/posts/${id}/cancel`,{method:'POST'}),
 }
