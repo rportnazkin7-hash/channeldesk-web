@@ -2,7 +2,7 @@ import { useCallback,useEffect,useState } from 'react'
 import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download } from 'lucide-react'
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit,type Task } from './api'
 
-const APP_VERSION = 'v0.17.2'
+const APP_VERSION = 'v0.18.0'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
@@ -45,7 +45,6 @@ export default function App(){
  const [advName,setAdvName]=useState(''),[advContact,setAdvContact]=useState('')
  const [bkAdv,setBkAdv]=useState<number|null>(null),[bkChannel,setBkChannel]=useState<number|null>(null),[bkCost,setBkCost]=useState(''),[bkDate,setBkDate]=useState(''),[bkErid,setBkErid]=useState(''),[bkNoErid,setBkNoErid]=useState(false)
  const [finType,setFinType]=useState<'income'|'expense'>('income'),[finAmount,setFinAmount]=useState(''),[finDesc,setFinDesc]=useState('')
- const [adsTab,setAdsTab]=useState<'bookings'|'advertisers'|'finance'>('bookings')
  const [mediaKits,setMediaKits]=useState<MediaKit[]>([])
  const [showMediaKits,setShowMediaKits]=useState(false)
  const [fabOpen,setFabOpen]=useState(false)
@@ -89,7 +88,7 @@ export default function App(){
  async function addCommentTo(id:number){buzz();if(!active||!commentText.trim())return;const w=active.id;try{await api.addComment(w,id,commentText.trim());setCommentText('');const cm=await api.comments(w,id);setComments(prev=>({...prev,[id]:cm}))}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления комментария')}}
  async function addButtonTo(id:number){buzz();if(!active||!btnText.trim()||!btnUrl.trim())return;const w=active.id;try{const post=posts.find(p=>p.id===id);const cur=post?.buttons||[];const next=[...cur,[{text:btnText.trim(),url:btnUrl.trim()}]];await api.updatePost(w,id,{buttons:next});setBtnText('');setBtnUrl('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления кнопки')}}
  async function useTemplate(t:Template){buzz();setNewTitle(t.title);setNewText(t.text);setFabOpen(false);setShowCompose(true);setTimeout(()=>{document.getElementById('draft-form')?.scrollIntoView({behavior:'smooth'})},80)}
- function openCreate(kind:'post'|'booking'|'task'|'advertiser'){buzz();setFabOpen(false);if(kind==='post'){setShowCompose(true);return}if(kind==='task'){setShowTasks(true);return}setAdsTab(kind==='booking'?'bookings':'advertisers');setTab('ads')}
+ function openCreate(kind:'post'|'booking'|'task'|'advertiser'){buzz();setFabOpen(false);if(kind==='post'){setShowCompose(true);return}if(kind==='task'){setShowTasks(true);return}setTab('ads')}
  async function saveTemplate(){buzz();if(!active||!newTplName.trim())return;try{await api.createTemplate(active.id,{name:newTplName.trim(),title:newTitle,text:newText});setNewTplName('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка сохранения шаблона')}}
  async function delTemplate(id:number){buzz();if(!active)return;try{await api.deleteTemplate(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления шаблона')}}
  const canManage=active?.role==='owner'||active?.role==='admin'
@@ -218,47 +217,23 @@ export default function App(){
   {!showCompose&&!showTasks&&!showMediaKits&&tab==='ads'&&<>
    {!active?<section className="panel"><div className="empty"><div className="empty-icon"><Megaphone/></div><h3>Создайте рабочее пространство</h3><p>Рекламный раздел появится после создания пространства.</p></div></section>:<>
     <section className="panel"><div className="panel-title"><h2>Реклама</h2><Megaphone size={20}/></div>
-     <div className="seg">
-      {(['bookings','advertisers','finance'] as const).map(t=><button key={t} className={adsTab===t?'seg-on':''} onClick={()=>{buzz();setAdsTab(t)}}>{t==='bookings'?'Брони':t==='advertisers'?'Рекламодатели':'Финансы'}</button>)}
-     </div>
-     {finSummary&&<div className="fin-cards">
-      <div><span>Доход</span><strong>{finSummary.income.toLocaleString('ru-RU')} ₽</strong></div>
-      <div><span>Расход</span><strong style={{color:'var(--danger)'}}>{finSummary.expense.toLocaleString('ru-RU')} ₽</strong></div>
-      <div><span>Прибыль</span><strong style={{color:'var(--accent-2)'}}>{finSummary.profit.toLocaleString('ru-RU')} ₽</strong></div>
-     </div>}
-     <div className="btn-row" style={{marginTop:14}}>
-      <button className="icon-btn" onClick={()=>sendExport(adsTab==='finance'?'finance':'bookings','csv')} title="Экспорт CSV"><Download size={15}/> CSV</button>
-      <button className="icon-btn" onClick={()=>sendExport(adsTab==='finance'?'finance':'bookings','xlsx')} title="Экспорт XLSX"><Download size={15}/> XLSX</button>
-     </div>
+     <p style={{color:'var(--muted)',fontSize:12,margin:'4px 0 0'}}>Рекламодатели и активные размещения. Создание — через «+» внизу.</p>
     </section>
 
-    {adsTab==='bookings'&&<section className="panel" style={{marginTop:14}}>
-     <div className="panel-title"><h2>Новая бронь</h2><Wallet size={20}/></div>
-     <label className="form-label">Рекламодатель</label>
-     <select className="field" value={bkAdv??''} onChange={e=>setBkAdv(e.target.value?Number(e.target.value):null)}>
-      <option value="">— выберите —</option>
-      {advertisers.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
-     </select>
-     <label className="form-label">Канал</label>
-     <select className="field" value={bkChannel??''} onChange={e=>setBkChannel(e.target.value?Number(e.target.value):null)}>
-      <option value="">— без канала —</option>
-      {channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}
-     </select>
-     <div className="btn-row" style={{marginTop:14}}>
-      <input className="field" placeholder="Стоимость, ₽" type="number" value={bkCost} onChange={e=>setBkCost(e.target.value)}/>
-      <input className="field" placeholder="Дата (ГГГГ-ММ-ДД)" type="date" value={bkDate} onChange={e=>setBkDate(e.target.value)}/>
-     </div>
-     <label className="form-label" style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}}>
-      <input type="checkbox" checked={bkNoErid} onChange={e=>setBkNoErid(e.target.checked)} style={{width:18,height:18,accentColor:'var(--accent-2)'}}/>
-      <span>ERID не требуется (обычный Telegram-канал)</span>
-     </label>
-     {!bkNoErid&&<>
-      <label className="form-label">ERID</label>
-      <input className="field" placeholder="erid: …" value={bkErid} onChange={e=>setBkErid(e.target.value)}/>
-     </>}
-     <button className="primary-btn" onClick={addBooking} disabled={!bkAdv}><Megaphone size={17}/> Создать бронь</button>
-     <div className="panel-title" style={{marginTop:20}}><h3 className="list-h">Бронирования</h3></div>
-     {bookings.length===0?<div className="empty"><p>Броней пока нет.</p></div>:bookings.map(b=><article key={b.id} style={{padding:'13px 0',borderBottom:'1px solid var(--border)'}}>
+    <section className="panel" style={{marginTop:14}}>
+     <div className="panel-title"><h2>Рекламодатели</h2><Users size={20}/><button className="icon-btn" onClick={()=>{buzz();setFabOpen(true)}} title="Добавить"><Plus size={15}/></button></div>
+     {advertisers.length===0?<div className="empty"><p>Рекламодателей пока нет. Добавьте через «+».</p></div>:advertisers.map(a=><div key={a.id} style={{padding:'12px 0',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+      <div><strong style={{fontSize:14}}>{a.name}</strong>{a.notes&&<div style={{color:'var(--muted)',fontSize:12}}>{a.notes}</div>}</div>
+      <div style={{display:'flex',gap:6,alignItems:'center'}}>
+       <span className="no-erid-badge" style={{marginTop:0}}>{bookings.filter(b=>b.advertiser_id===a.id).length} броней</span>
+       <button onClick={()=>delAdvertiser(a.id)} disabled={busy} className="icon-btn danger" title="Удалить"><Trash2 size={14}/></button>
+      </div>
+     </div>)}
+    </section>
+
+    <section className="panel" style={{marginTop:14}}>
+     <div className="panel-title"><h2>Активные брони</h2><Wallet size={20}/><button className="icon-btn" onClick={()=>{buzz();setFabOpen(true)}} title="Добавить"><Plus size={15}/></button></div>
+     {bookings.filter(b=>!['done','cancelled'].includes(b.status)).length===0?<div className="empty"><p>Активных броней нет. Создайте через «+».</p></div>:bookings.filter(b=>!['done','cancelled'].includes(b.status)).map(b=><article key={b.id} style={{padding:'13px 0',borderBottom:'1px solid var(--border)'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
        <strong style={{fontSize:14}}>{b.advertiser_name||`#${b.advertiser_id}`}</strong>
        <span className={"status status-"+b.status}>{BOOKING_STATUS_LABEL[b.status]||b.status}</span>
@@ -272,141 +247,18 @@ export default function App(){
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10,alignItems:'center'}}>
        <span className={"status "+(b.payment_status==='paid'?'status-published':b.payment_status==='partially_paid'?'status-review':'status-cancelled')}>{PAYMENT_LABEL[b.payment_status]||b.payment_status}</span>
        {b.payment_status!=='paid'&&<button onClick={()=>payBooking(b.id)} disabled={busy}>✓ Оплачено</button>}
-       <button onClick={()=>delBooking(b.id)} disabled={busy} style={{opacity:.7}}>Удалить</button>
       </div>
      </article>)}
-    </section>}
-
-    {adsTab==='advertisers'&&<section className="panel" style={{marginTop:14}}>
-     <div className="panel-title"><h2>Новый рекламодатель</h2><Users size={20}/></div>
-     <input className="field" placeholder="Название / компания" value={advName} onChange={e=>setAdvName(e.target.value)} style={{marginTop:12}}/>
-     <input className="field" placeholder="Контакты (телефон, @telegram, email…)" value={advContact} onChange={e=>setAdvContact(e.target.value)} style={{marginTop:10}}/>
-     <button className="primary-btn" onClick={addAdvertiser} disabled={!advName.trim()}><Plus size={17}/> Добавить рекламодателя</button>
-     <div className="panel-title" style={{marginTop:20}}><h3 className="list-h">Рекламодатели</h3></div>
-     {advertisers.length===0?<div className="empty"><p>Рекламодателей пока нет.</p></div>:advertisers.map(a=><div key={a.id} style={{padding:'13px 0',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-      <div><strong style={{fontSize:14}}>{a.name}</strong>{a.notes&&<div style={{color:'var(--muted)',fontSize:12}}>{a.notes}</div>}</div>
-      <button onClick={()=>delAdvertiser(a.id)} disabled={busy} className="icon-btn danger" title="Удалить"><Trash2 size={14}/></button>
-     </div>)}
-    </section>}
-
-    {adsTab==='finance'&&<section className="panel" style={{marginTop:14}}>
-     <div className="panel-title"><h2>Транзакция</h2><Wallet size={20}/></div>
-     <div className="seg" style={{marginTop:12}}>
-      {(['income','expense'] as const).map(t=><button key={t} className={finType===t?'seg-on':''} onClick={()=>{buzz();setFinType(t)}}>{t==='income'?'Доход':'Расход'}</button>)}
-     </div>
-     <div className="btn-row" style={{marginTop:12}}>
-      <input className="field" placeholder="Сумма" type="number" value={finAmount} onChange={e=>setFinAmount(e.target.value)}/>
-     </div>
-     <input className="field" placeholder="Описание" value={finDesc} onChange={e=>setFinDesc(e.target.value)} style={{marginTop:10}}/>
-     <button className="primary-btn" onClick={addFinance} disabled={!Number(finAmount)}><Plus size={17}/> Добавить</button>
-     {finSummary&&<p style={{color:'var(--muted)',fontSize:13,marginTop:16,textAlign:'center'}}>Итог за {MONTHS[finSummary.month-1]}: доход {finSummary.income.toLocaleString('ru-RU')} ₽ · расход {finSummary.expense.toLocaleString('ru-RU')} ₽ · прибыль {finSummary.profit.toLocaleString('ru-RU')} ₽</p>}
-    </section>}
+    </section>
    </>}
   </>}
-
-  {showCompose&&<section id="draft-form" className="panel">
-   <div className="panel-title"><h2>Новый пост</h2><FileText size={20}/></div>
-   <button className="icon-btn" onClick={()=>{buzz();setShowCompose(false)}} style={{marginBottom:10}}>← Назад</button>
-   {!active?<>
-    <p style={{color:'var(--muted)',fontSize:13}}>Создайте рабочее пространство, чтобы публиковать посты.</p>
-    <input className="field" placeholder="Название пространства" value={name} onChange={e=>setName(e.target.value)}/>
-    <button className="primary-btn" onClick={create}><CirclePlus size={18}/> Создать пространство</button>
-   </>:<>
-    <label className="form-label">Заголовок</label>
-    <input className="field" placeholder="О чём пост?" value={newTitle} onChange={e=>setNewTitle(e.target.value)}/>
-    <label className="form-label">Текст (Telegram HTML: &lt;b&gt;, &lt;i&gt;, &lt;a href=…&gt;)</label>
-    <textarea className="field" rows={5} placeholder="Текст публикации…" value={newText} onChange={e=>setNewText(e.target.value)}/>
-    <label className="form-label">Канал</label>
-    <select className="field" value={draftChannel??''} onChange={e=>setDraftChannel(e.target.value?Number(e.target.value):null)}>
-     <option value="">— без канала —</option>
-     {channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}
-    </select>
-    <label className="form-label">Кнопки (до 8)</label>
-    <div className="btn-row">
-     <input className="field" placeholder="Текст кнопки" value={draftBtnText} onChange={e=>setDraftBtnText(e.target.value)}/>
-     <input className="field" placeholder="https://…" value={draftBtnUrl} onChange={e=>setDraftBtnUrl(e.target.value)}/>
-     <button className="icon-btn" onClick={addDraftBtn} disabled={!draftBtnText.trim()||!draftBtnUrl.trim()} title="Добавить кнопку"><Plus size={16}/></button>
-    </div>
-    {draftBtns.length>0&&<div className="chip-wrap">{draftBtns.map((b,i)=><span key={i} className="btn-chip">🔗 {b.text} <button onClick={()=>{buzz();setDraftBtns(draftBtns.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'var(--danger)',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
-    <label className="form-label">Вложения (фото, видео, документы)</label>
-    <label className="file-btn"><Paperclip size={15}/> Выбрать файлы<input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" style={{display:'none'}} onChange={e=>pickFiles(e.target.files)}/></label>
-    {draftFiles.length>0&&<div className="chip-wrap">{draftFiles.map((f,i)=><span key={i} className="btn-chip">📎 {f.name.length>22?f.name.slice(0,22)+'…':f.name} <button onClick={()=>{buzz();setDraftFiles(draftFiles.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'var(--danger)',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
-    <div style={{marginTop:14}}><span style={{color:'var(--muted)',fontSize:12}}>Шаблоны: </span>{templates.length?templates.map(t=><button key={t.id} onClick={()=>useTemplate(t)} disabled={busy} className="chip-btn">{t.name}</button>):<span style={{color:'var(--muted-2)',fontSize:12}}>нет</span>}</div>
-    <button className="primary-btn" onClick={createDraft} disabled={busy||!newTitle.trim()}><CirclePlus size={18}/> Создать черновик {draftFiles.length?`(${draftFiles.length} вл.)`:''}</button>
-   </>}
-  </section>}
-
-  {showTasks&&<section className="panel">
-   <div className="panel-title"><h2>Задачи</h2><CheckCircle2 size={20}/></div>
-   <button className="icon-btn" onClick={()=>{buzz();setShowTasks(false)}} style={{marginBottom:12}}>← Назад</button>
-   <label className="form-label">Новая задача</label>
-   <input className="field" placeholder="Что нужно сделать?" value={taskTitle} onChange={e=>setTaskTitle(e.target.value)}/>
-   <textarea className="field" rows={2} placeholder="Описание…" value={taskDesc} onChange={e=>setTaskDesc(e.target.value)} style={{marginTop:10}}/>
-   <div className="btn-row" style={{marginTop:10}}>
-    <select className="field" value={taskPriority} onChange={e=>setTaskPriority(e.target.value)}>
-     <option value="low">Низкий</option><option value="normal">Обычный</option><option value="high">Высокий</option><option value="urgent">Срочный</option>
-    </select>
-    <input className="field" placeholder="Срок (дата)" type="date" value={taskDue} onChange={e=>setTaskDue(e.target.value)}/>
-   </div>
-   <button className="primary-btn" onClick={addTask} disabled={!taskTitle.trim()}><Plus size={17}/> Создать задачу</button>
-   <div style={{marginTop:18}}>
-    {tasks.length===0?<div className="empty"><p>Задач пока нет.</p></div>:tasks.map(tk=><article key={tk.id} style={{padding:'13px 0',borderBottom:'1px solid var(--border)'}}>
-     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
-      <strong style={{fontSize:14,textDecoration:tk.status==='done'?'line-through':'none',opacity:tk.status==='done'?.6:1}}>{tk.title}</strong>
-      <span className={"status "+(tk.status==='done'?'status-published':tk.priority==='urgent'||tk.priority==='high'?'status-changes_requested':'status-scheduled')}>{tk.status==='done'?'Готово':tk.priority==='urgent'?'Срочно':tk.priority==='high'?'Высокий':'Обычный'}</span>
-     </div>
-     {tk.description&&<p style={{color:'var(--muted)',fontSize:12,margin:'6px 0 0'}}>{tk.description}</p>}
-     <p style={{color:'var(--muted-2)',fontSize:11,margin:'4px 0 0'}}>
-      {tk.due_at?`Срок: ${fmtDate(tk.due_at)}`:''}
-      {tk.assignee_first_name?` · Исполнитель: ${tk.assignee_first_name}`:''}
-     </p>
-     <div style={{display:'flex',gap:8,marginTop:10}}>
-      {tk.status!=='done'&&<button onClick={()=>completeTask(tk.id)} disabled={busy}>✓ Выполнено</button>}
-      <button onClick={()=>delTask(tk.id)} disabled={busy} style={{opacity:.7}}>Удалить</button>
-     </div>
-    </article>)}
-   </div>
-  </section>}
-
-  {showMediaKits&&<section className="panel">
-   <div className="panel-title"><h2>Медиакиты</h2><ImageIcon size={20}/></div>
-   <button className="icon-btn" onClick={()=>{buzz();setShowMediaKits(false)}} style={{marginBottom:12}}>← Назад</button>
-   <label className="form-label">Название</label>
-   <input className="field" placeholder="Медиакит канала «Новости»" value={mkName} onChange={e=>setMkName(e.target.value)}/>
-   <label className="form-label">Канал</label>
-   <select className="field" value={mkChannel??''} onChange={e=>setMkChannel(e.target.value?Number(e.target.value):null)}>
-    <option value="">— без канала —</option>
-    {channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}
-   </select>
-   <label className="form-label">Описание</label>
-   <textarea className="field" rows={2} placeholder="О канале, аудитории…" value={mkDesc} onChange={e=>setMkDesc(e.target.value)}/>
-   <div className="btn-row" style={{marginTop:14}}>
-    <input className="field" placeholder="Подписчики" type="number" value={mkSubs} onChange={e=>setMkSubs(e.target.value)}/>
-    <input className="field" placeholder="Цена поста, ₽" type="number" value={mkPrice} onChange={e=>setMkPrice(e.target.value)}/>
-   </div>
-   <button className="primary-btn" onClick={addMediaKit} disabled={!mkName.trim()}><Plus size={17}/> Создать медиакит</button>
-   <div style={{marginTop:18}}>
-    {mediaKits.length===0?<div className="empty"><p>Медиакитов пока нет.</p></div>:mediaKits.map(k=><article key={k.id} style={{padding:'13px 0',borderBottom:'1px solid var(--border)'}}>
-     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
-      <strong style={{fontSize:14}}>{k.name}</strong>
-      <button onClick={()=>delMediaKit(k.id)} disabled={busy} className="icon-btn danger" title="Удалить"><Trash2 size={14}/></button>
-     </div>
-     <p style={{color:'var(--muted)',fontSize:12,margin:'6px 0 0'}}>
-      {k.channel_title||'без канала'}
-      {k.stats&&typeof k.stats==='object'&&'subscribers' in k.stats&&(k.stats as Record<string,number>).subscribers?` · ${Number((k.stats as Record<string,number>).subscribers).toLocaleString('ru-RU')} подписчиков`:''}
-     </p>
-     {k.description&&<p style={{fontSize:13,margin:'6px 0 0',color:'var(--text-2)'}}>{k.description}</p>}
-     {Array.isArray(k.pricing)&&k.pricing.length>0&&<p style={{color:'var(--accent-2)',fontSize:12,margin:'6px 0 0'}}>{(k.pricing[0] as {format?:string;price?:number}).format||'пост'}: {(k.pricing[0] as {price?:number}).price?.toLocaleString('ru-RU')} ₽</p>}
-    </article>)}
-   </div>
-  </section>}
 
   {!showMediaKits&&!showTasks&&tab==='more'&&<section className="panel"><div className="panel-title"><h2>Ещё</h2><MoreHorizontal size={20}/></div>
    {[
     {icon:Megaphone,label:'Каналы',desc:'Управление подключёнными каналами',action:()=>goSection('channels-section')},
     {icon:Users,label:'Команда',desc:'Участники и приглашения',action:()=>goSection('team-section')},
     {icon:CheckCircle2,label:'Задачи',desc:'Задачи и напоминания',action:()=>{buzz();setShowTasks(true)}},
-    {icon:LineChart,label:'Аналитика',desc:'Отчёты по каналам',action:()=>{buzz();setAdsTab('finance');setTab('ads')}},
+    {icon:LineChart,label:'Аналитика',desc:'Скоро — доходы, расходы и отчёты'},
     {icon:ImageIcon,label:'Медиакиты',desc:'Презентация для рекламодателей',action:()=>{buzz();setShowMediaKits(true)}},
     {icon:Settings,label:'Настройки',desc:'Пространство и уведомления'},
    ].map(item=>{
