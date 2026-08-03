@@ -68,8 +68,11 @@ def ensure_bucket() -> None:
         "INSERT INTO storage.buckets (id, name, public, file_size_limit) "
         "VALUES ('channeldesk-assets','channeldesk-assets',true,52428800) "
         "ON CONFLICT (id) DO UPDATE SET public=true",
-        "ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY",
-        # Аноним может ЗАГРУЖАТЬ файлы в этот bucket (прямая загрузка из браузера)
+        # ПРИМЕЧАНИЕ: ALTER TABLE storage.objects и CREATE POLICY из роли postgres
+        # невозможны («must be owner») — RLS уже включён по умолчанию, а политика
+        # на загрузку создаётся вручную в Supabase Storage → Policies (см. 006).
+        # Здесь политика создаётся best-effort: если есть права — сработает,
+        # если нет — ошибка попадёт в лог, и политику создадут через UI.
         """DO $$
         BEGIN
           IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
