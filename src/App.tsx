@@ -1,12 +1,15 @@
 import { useEffect,useState } from 'react'
 import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X } from 'lucide-react'
-import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset } from './api'
+import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary } from './api'
 
-const APP_VERSION = 'v0.10.1'
+const APP_VERSION = 'v0.11.0'
 type Tab = 'overview'|'calendar'|'create'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
 const MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
+const BOOKING_STATUS_LABEL:Record<string,string>={requested:'Заявка',confirmed:'Подтверждено',in_progress:'Идёт',done:'Выполнено',cancelled:'Отменено'}
+const PAYMENT_LABEL:Record<string,string>={unpaid:'Не оплачено',partially_paid:'Частично',paid:'Оплачено'}
+const FORMAT_LABEL:Record<string,string>={post:'Пост',mention:'Упоминание',repost:'Репост',other:'Другое'}
 
 function buzz(){try{window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')}catch{}}
 function dayKey(d:Date){return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`}
@@ -38,9 +41,20 @@ export default function App(){
  const [openPost,setOpenPost]=useState<number|null>(null),[comments,setComments]=useState<Record<number,Comment[]>>({}),[versions,setVersions]=useState<Record<number,Version[]>>({}),[commentText,setCommentText]=useState('')
  const [assetsByPost,setAssetsByPost]=useState<Record<number,Asset[]>>({})
  const [templates,setTemplates]=useState<Template[]>([]),[newTplName,setNewTplName]=useState(''),[btnText,setBtnText]=useState(''),[btnUrl,setBtnUrl]=useState('')
+ const [advertisers,setAdvertisers]=useState<Advertiser[]>([]),[bookings,setBookings]=useState<Booking[]>([]),[finSummary,setFinSummary]=useState<FinanceSummary|null>(null)
+ const [advName,setAdvName]=useState(''),[advContact,setAdvContact]=useState('')
+ const [bkAdv,setBkAdv]=useState<number|null>(null),[bkChannel,setBkChannel]=useState<number|null>(null),[bkCost,setBkCost]=useState(''),[bkDate,setBkDate]=useState(''),[bkErid,setBkErid]=useState('')
+ const [finType,setFinType]=useState<'income'|'expense'>('income'),[finAmount,setFinAmount]=useState(''),[finDesc,setFinDesc]=useState('')
+ const [adsTab,setAdsTab]=useState<'bookings'|'advertisers'|'finance'>('bookings')
  const hasInitData=!!(window.Telegram?.WebApp?.initData)
 
- async function load(){setLoading(true);setError('');try{const s=await api.workspaces();setSpaces(s);const a=active&&s.some(x=>x.id===active.id)?active:s[0]||null;setActive(a);const [p,c,m,po,t]=await Promise.all([api.pending(),a?api.channels(a.id):Promise.resolve([]),a?api.members(a.id):Promise.resolve([]),a?api.posts(a.id):Promise.resolve([]),a?api.templates(a.id):Promise.resolve([])]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setOpenPost(null)}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки')}finally{setLoading(false)}}
+ async function load(){setLoading(true);setError('');try{const s=await api.workspaces();setSpaces(s);const a=active&&s.some(x=>x.id===active.id)?active:s[0]||null;setActive(a);const [p,c,m,po,t,ad,bk,fs]=await Promise.all([api.pending(),a?api.channels(a.id):Promise.resolve([]),a?api.members(a.id):Promise.resolve([]),a?api.posts(a.id):Promise.resolve([]),a?api.templates(a.id):Promise.resolve([]),a?api.advertisers(a.id):Promise.resolve([]),a?api.bookings(a.id):Promise.resolve([]),a?api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1):Promise.resolve(null)]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFinSummary(fs);setOpenPost(null)}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки')}finally{setLoading(false)}}
+ async function addAdvertiser(){buzz();if(!active)return;setError('');try{await api.createAdvertiser(active.id,{name:advName,notes:advContact});setAdvName('');setAdvContact('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления рекламодателя')}}
+ async function delAdvertiser(id:number){buzz();if(!active)return;try{await api.deleteAdvertiser(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления рекламодателя')}}
+ async function addBooking(){buzz();if(!active)return;setError('');try{await api.createBooking(active.id,{advertiser_id:bkAdv??0,cost:Number(bkCost)||0,channel_id:bkChannel,publish_at:bkDate?new Date(bkDate).toISOString():null,erid:bkErid||null});setBkAdv(null);setBkCost('');setBkDate('');setBkErid('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания брони')}}
+ async function payBooking(id:number){buzz();if(!active)return;try{await api.payBooking(active.id,id,'paid');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка отметки оплаты')}}
+ async function delBooking(id:number){buzz();if(!active)return;try{await api.deleteBooking(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления брони')}}
+ async function addFinance(){buzz();if(!active)return;setError('');try{await api.createTransaction(active.id,{type:finType,amount:Number(finAmount)||0,category:finType==='income'?'advertising':'other',description:finDesc});setFinAmount('');setFinDesc('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления транзакции')}}
  useEffect(()=>{const sp=window.Telegram?.WebApp?.initDataUnsafe?.start_param||'';if(sp.startsWith('invite_')){api.acceptInvite(sp.slice('invite_'.length)).then(res=>{setJoined({workspace_name:res.workspace_name,role:res.role});return load()}).catch(e=>{setError(e instanceof Error?e.message:'Ошибка принятия приглашения');return load()})}else{load()}},[])
  async function create(){buzz();try{await api.createWorkspace(name);setName('Моё агентство');await load();setTab('overview')}catch(e){setError(e instanceof Error?e.message:'Ошибка')}}
  async function connect(id:number){buzz();if(!active)return;try{await api.connect(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка подключения')}}
@@ -208,7 +222,84 @@ export default function App(){
    </>}
   </section>}
 
-  {tab==='ads'&&<section className="panel"><div className="panel-title"><h2>Реклама</h2><Megaphone size={20}/></div><div className="empty"><div className="empty-icon"><Wallet/></div><h3>Рекламный календарь — Этап C</h3><p>Здесь будут рекламодатели, бронирования слотов, ERID и оплаты.</p></div></section>}
+  {tab==='ads'&&<>
+   {!active?<section className="panel"><div className="empty"><div className="empty-icon"><Megaphone/></div><h3>Создайте рабочее пространство</h3><p>Рекламный раздел появится после создания пространства.</p></div></section>:<>
+    <section className="panel"><div className="panel-title"><h2>Реклама</h2><Megaphone size={20}/></div>
+     <div className="seg">
+      {(['bookings','advertisers','finance'] as const).map(t=><button key={t} className={adsTab===t?'seg-on':''} onClick={()=>{buzz();setAdsTab(t)}}>{t==='bookings'?'Брони':t==='advertisers'?'Рекламодатели':'Финансы'}</button>)}
+     </div>
+     {finSummary&&<div className="fin-cards">
+      <div><span>Доход</span><strong>{finSummary.income.toLocaleString('ru-RU')} ₽</strong></div>
+      <div><span>Расход</span><strong style={{color:'#ff9b9b'}}>{finSummary.expense.toLocaleString('ru-RU')} ₽</strong></div>
+      <div><span>Прибыль</span><strong style={{color:'#72d99f'}}>{finSummary.profit.toLocaleString('ru-RU')} ₽</strong></div>
+     </div>}
+    </section>
+
+    {adsTab==='bookings'&&<section className="panel" style={{marginTop:14}}>
+     <div className="panel-title"><h2>Новая бронь</h2><Wallet size={20}/></div>
+     <label className="form-label">Рекламодатель</label>
+     <select className="field" value={bkAdv??''} onChange={e=>setBkAdv(e.target.value?Number(e.target.value):null)}>
+      <option value="">— выберите —</option>
+      {advertisers.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+     </select>
+     <label className="form-label">Канал</label>
+     <select className="field" value={bkChannel??''} onChange={e=>setBkChannel(e.target.value?Number(e.target.value):null)}>
+      <option value="">— без канала —</option>
+      {channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}
+     </select>
+     <div className="btn-row" style={{marginTop:14}}>
+      <input className="field" placeholder="Стоимость, ₽" type="number" value={bkCost} onChange={e=>setBkCost(e.target.value)}/>
+      <input className="field" placeholder="Дата (ГГГГ-ММ-ДД)" type="date" value={bkDate} onChange={e=>setBkDate(e.target.value)}/>
+     </div>
+     <label className="form-label">ERID</label>
+     <input className="field" placeholder="erid: …" value={bkErid} onChange={e=>setBkErid(e.target.value)}/>
+     <button className="primary-btn" onClick={addBooking} disabled={!bkAdv}><Megaphone size={17}/> Создать бронь</button>
+     <div className="panel-title" style={{marginTop:20}}><h3 className="list-h">Бронирования</h3></div>
+     {bookings.length===0?<div className="empty"><p>Броней пока нет.</p></div>:bookings.map(b=><article key={b.id} style={{padding:'13px 0',borderBottom:'1px solid #222936'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
+       <strong style={{fontSize:14}}>{b.advertiser_name||`#${b.advertiser_id}`}</strong>
+       <span className={"status status-"+b.status}>{BOOKING_STATUS_LABEL[b.status]||b.status}</span>
+      </div>
+      <p style={{color:'#8d96a8',fontSize:12,margin:'6px 0 0'}}>
+       {FORMAT_LABEL[b.format]||b.format} · {b.cost.toLocaleString('ru-RU')} {b.currency}
+       {b.channel_title?` · ${b.channel_title}`:''}
+       {b.publish_at?` · ${fmtDate(b.publish_at)}`:''}
+      </p>
+      {b.erid&&<p style={{color:'#5b6475',fontSize:11,margin:'4px 0 0'}}>{b.erid}</p>}
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10,alignItems:'center'}}>
+       <span className={"status "+(b.payment_status==='paid'?'status-published':b.payment_status==='partially_paid'?'status-review':'status-cancelled')}>{PAYMENT_LABEL[b.payment_status]||b.payment_status}</span>
+       {b.payment_status!=='paid'&&<button onClick={()=>payBooking(b.id)} disabled={busy}>✓ Оплачено</button>}
+       <button onClick={()=>delBooking(b.id)} disabled={busy} style={{opacity:.7}}>Удалить</button>
+      </div>
+     </article>)}
+    </section>}
+
+    {adsTab==='advertisers'&&<section className="panel" style={{marginTop:14}}>
+     <div className="panel-title"><h2>Новый рекламодатель</h2><Users size={20}/></div>
+     <input className="field" placeholder="Название / компания" value={advName} onChange={e=>setAdvName(e.target.value)} style={{marginTop:12}}/>
+     <input className="field" placeholder="Контакты (телефон, @telegram, email…)" value={advContact} onChange={e=>setAdvContact(e.target.value)} style={{marginTop:10}}/>
+     <button className="primary-btn" onClick={addAdvertiser} disabled={!advName.trim()}><Plus size={17}/> Добавить рекламодателя</button>
+     <div className="panel-title" style={{marginTop:20}}><h3 className="list-h">Рекламодатели</h3></div>
+     {advertisers.length===0?<div className="empty"><p>Рекламодателей пока нет.</p></div>:advertisers.map(a=><div key={a.id} style={{padding:'13px 0',borderBottom:'1px solid #222936',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+      <div><strong style={{fontSize:14}}>{a.name}</strong>{a.notes&&<div style={{color:'#8d96a8',fontSize:12}}>{a.notes}</div>}</div>
+      <button onClick={()=>delAdvertiser(a.id)} disabled={busy} className="icon-btn danger" title="Удалить"><Trash2 size={14}/></button>
+     </div>)}
+    </section>}
+
+    {adsTab==='finance'&&<section className="panel" style={{marginTop:14}}>
+     <div className="panel-title"><h2>Транзакция</h2><Wallet size={20}/></div>
+     <div className="seg" style={{marginTop:12}}>
+      {(['income','expense'] as const).map(t=><button key={t} className={finType===t?'seg-on':''} onClick={()=>{buzz();setFinType(t)}}>{t==='income'?'Доход':'Расход'}</button>)}
+     </div>
+     <div className="btn-row" style={{marginTop:12}}>
+      <input className="field" placeholder="Сумма" type="number" value={finAmount} onChange={e=>setFinAmount(e.target.value)}/>
+     </div>
+     <input className="field" placeholder="Описание" value={finDesc} onChange={e=>setFinDesc(e.target.value)} style={{marginTop:10}}/>
+     <button className="primary-btn" onClick={addFinance} disabled={!Number(finAmount)}><Plus size={17}/> Добавить</button>
+     {finSummary&&<p style={{color:'#8d96a8',fontSize:13,marginTop:16,textAlign:'center'}}>Итог за {MONTHS[finSummary.month-1]}: доход {finSummary.income.toLocaleString('ru-RU')} ₽ · расход {finSummary.expense.toLocaleString('ru-RU')} ₽ · прибыль {finSummary.profit.toLocaleString('ru-RU')} ₽</p>}
+    </section>}
+   </>}
+  </>}
 
   {tab==='more'&&<section className="panel"><div className="panel-title"><h2>Ещё</h2><MoreHorizontal size={20}/></div>
    {[

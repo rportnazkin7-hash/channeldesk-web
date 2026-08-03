@@ -23,6 +23,10 @@ export type Comment={id:number;text:string;created_at:string;username:string|nul
 export type Version={id:number;title:string;text:string;created_by:number|null;created_at:string}
 export type Template={id:number;name:string;title:string;text:string}
 export type Asset={id:number;file_name:string;file_type:string;file_url:string;size_bytes:number|null}
+export type Advertiser={id:number;name:string;contact:Record<string,string>|null;notes:string;is_active:boolean}
+export type Booking={id:number;advertiser_id:number;channel_id:number|null;post_id:number|null;format:string;cost:number;currency:string;status:string;payment_status:string;publish_at:string|null;delete_at:string|null;erid:string|null;materials_url:string|null;report_url:string|null;advertiser_name:string|null;channel_title:string|null}
+export type FinanceTx={id:number;booking_id:number|null;type:'income'|'expense';amount:number;currency:string;category:string;description:string;occurred_at:string}
+export type FinanceSummary={year:number;month:number;income:number;expense:number;profit:number;count:number}
 export type UploadTicket={asset_id:number;file_url:string;upload_url:string;anon_key:string;bucket:string}
 async function uploadDirect(ticket:UploadTicket,file:File):Promise<void>{
  const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),90000)
@@ -64,4 +68,14 @@ export const api={
  uploadTicket:(wid:number,p:{post_id:number;file_name:string;content_type:string;size:number})=>req<UploadTicket>(`/api/workspaces/${wid}/assets/upload-url`,{method:'POST',body:JSON.stringify(p)}),
  uploadDirect,
  deleteAsset:(id:number)=>req<void>(`/api/assets/${id}`,{method:'DELETE'}),
+ advertisers:(wid:number)=>req<Advertiser[]>(`/api/workspaces/${wid}/advertisers`),
+ createAdvertiser:(wid:number,p:{name:string;contact?:Record<string,string>;notes?:string})=>req<Advertiser>(`/api/workspaces/${wid}/advertisers`,{method:'POST',body:JSON.stringify(p)}),
+ deleteAdvertiser:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/advertisers/${id}`,{method:'DELETE'}),
+ bookings:(wid:number,status?:string)=>req<Booking[]>(`/api/workspaces/${wid}/bookings${status?`?status=${status}`:''}`),
+ createBooking:(wid:number,p:{advertiser_id:number;channel_id?:number|null;format?:string;cost:number;currency?:string;publish_at?:string|null;erid?:string|null;materials_url?:string|null})=>req<Booking>(`/api/workspaces/${wid}/bookings`,{method:'POST',body:JSON.stringify(p)}),
+ updateBooking:(wid:number,id:number,p:Record<string,unknown>)=>req<Booking>(`/api/workspaces/${wid}/bookings/${id}`,{method:'PATCH',body:JSON.stringify(p)}),
+ payBooking:(wid:number,id:number,payment_status:string)=>req<Booking>(`/api/workspaces/${wid}/bookings/${id}/pay`,{method:'POST',body:JSON.stringify({payment_status})}),
+ deleteBooking:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/bookings/${id}`,{method:'DELETE'}),
+ financeSummary:(wid:number,year:number,month:number)=>req<FinanceSummary>(`/api/workspaces/${wid}/finance/summary?year=${year}&month=${month}`),
+ createTransaction:(wid:number,p:{type:'income'|'expense';amount:number;category?:string;description?:string})=>req<FinanceTx>(`/api/workspaces/${wid}/finance/transactions`,{method:'POST',body:JSON.stringify(p)}),
 }

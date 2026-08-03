@@ -25,6 +25,14 @@ MATRIX: dict[str, frozenset[str]] = {
     'post.review': frozenset({'owner','admin','editor'}),
     'post.schedule': frozenset({'owner','admin','editor','ad_manager'}),
     'post.publish': frozenset({'owner','admin','editor'}),
+
+    # Реклама и финансы (Этап C)
+    'advertiser.view': frozenset({'owner','admin','editor','author','designer','ad_manager','analyst','viewer'}),
+    'advertiser.manage': frozenset({'owner','admin','ad_manager'}),
+    'booking.view': frozenset({'owner','admin','editor','author','designer','ad_manager','analyst','viewer'}),
+    'booking.manage': frozenset({'owner','admin','ad_manager'}),
+    'finance.view': frozenset({'owner','admin','analyst','ad_manager'}),
+    'finance.manage': frozenset({'owner','admin','ad_manager'}),
 }
 
 
