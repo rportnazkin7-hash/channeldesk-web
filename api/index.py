@@ -49,7 +49,16 @@ def health():
     return {'ok': True, 'service': 'ChannelDesk API', 'version': '0.16.0'}
 
 
-@app.get('/api/health/migrations')
+@app.get('/api/health/db-hash')
+def health_db_hash():
+    """Хэш DATABASE_URL со стороны Vercel — для сравнения с хэшем в /status бота."""
+    import hashlib
+    from api.db import database_url
+    try:
+        raw = database_url()
+        return {'hash': hashlib.sha256(raw.encode()).hexdigest()[:10], 'host': raw.split('@')[-1]}
+    except Exception as exc:
+        return {'error': str(exc)}
 def health_migrations():
     """Список применённых миграций из schema_migrations (через БД — работает)."""
     try:
