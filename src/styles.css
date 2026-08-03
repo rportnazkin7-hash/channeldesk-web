@@ -137,4 +137,14 @@ nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:re
 nav button{border:0;background:none;color:var(--muted-2);display:grid;justify-items:center;gap:3px;font-size:9px;padding:6px 0}
 nav button.active{color:var(--accent-2)}
 nav button.active svg{filter:drop-shadow(0 0 6px #10b98155)}
+/* ---------- FAB (центр создания) ---------- */
+.fab{grid-column:3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:0;background:none;color:var(--accent-2);font-size:9px;padding:0;transform:translateY(-14px)}
+.fab svg{background:linear-gradient(180deg,var(--accent-2),var(--accent-3));color:#04231a;border-radius:50%;padding:7px;width:46px;height:46px;box-shadow:0 4px 16px #10b98144,0 0 0 4px #0b0d10}
+.fab:active svg{transform:scale(.94)}
+/* ---------- Шторка создания ---------- */
+.fab-overlay{position:fixed;inset:0;z-index:40;background:#0009;display:flex;align-items:flex-end;backdrop-filter:blur(2px)}
+.fab-sheet{width:100%;max-width:720px;margin:0 auto;background:var(--panel);border:1px solid var(--border);border-top-left-radius:18px;border-top-right-radius:18px;padding:16px 14px calc(16px + env(safe-area-inset-bottom))}
+.fab-sheet .panel-title{margin-bottom:8px}
+.fab-item{display:flex;gap:11px;align-items:center;width:100%;background:none;border:0;border-bottom:1px solid var(--border);padding:12px 2px;color:var(--text);text-align:left}
+.fab-item:last-of-type{border-bottom:0}
 @media(min-width:700px){.app{max-width:720px;margin:auto}.stats{grid-template-columns:repeat(4,1fr)}}

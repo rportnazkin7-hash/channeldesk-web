@@ -2,8 +2,8 @@ import { useCallback,useEffect,useState } from 'react'
 import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download } from 'lucide-react'
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit,type Task } from './api'
 
-const APP_VERSION = 'v0.17.0'
-type Tab = 'overview'|'calendar'|'create'|'ads'|'more'
+const APP_VERSION = 'v0.17.1'
+type Tab = 'overview'|'calendar'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
 const MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
@@ -48,6 +48,8 @@ export default function App(){
  const [adsTab,setAdsTab]=useState<'bookings'|'advertisers'|'finance'>('bookings')
  const [mediaKits,setMediaKits]=useState<MediaKit[]>([])
  const [showMediaKits,setShowMediaKits]=useState(false)
+ const [fabOpen,setFabOpen]=useState(false)
+ const [showCompose,setShowCompose]=useState(false)
  const [tasks,setTasks]=useState<Task[]>([])
  const [showTasks,setShowTasks]=useState(false)
  const [taskTitle,setTaskTitle]=useState(''),[taskDesc,setTaskDesc]=useState(''),[taskPriority,setTaskPriority]=useState('normal'),[taskDue,setTaskDue]=useState('')
@@ -86,7 +88,8 @@ export default function App(){
  async function delAsset(postId:number,assetId:number){buzz();if(!active)return;try{await api.deleteAsset(assetId);const as=await api.assets(active.id,postId);setAssetsByPost(prev=>({...prev,[postId]:as}))}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления вложения')}}
  async function addCommentTo(id:number){buzz();if(!active||!commentText.trim())return;const w=active.id;try{await api.addComment(w,id,commentText.trim());setCommentText('');const cm=await api.comments(w,id);setComments(prev=>({...prev,[id]:cm}))}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления комментария')}}
  async function addButtonTo(id:number){buzz();if(!active||!btnText.trim()||!btnUrl.trim())return;const w=active.id;try{const post=posts.find(p=>p.id===id);const cur=post?.buttons||[];const next=[...cur,[{text:btnText.trim(),url:btnUrl.trim()}]];await api.updatePost(w,id,{buttons:next});setBtnText('');setBtnUrl('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления кнопки')}}
- async function useTemplate(t:Template){buzz();setNewTitle(t.title);setNewText(t.text);setTab('calendar');setTimeout(()=>{document.getElementById('draft-form')?.scrollIntoView({behavior:'smooth'})},80)}
+ async function useTemplate(t:Template){buzz();setNewTitle(t.title);setNewText(t.text);setFabOpen(false);setShowCompose(true);setTimeout(()=>{document.getElementById('draft-form')?.scrollIntoView({behavior:'smooth'})},80)}
+ function openCreate(kind:'post'|'booking'|'task'|'advertiser'){buzz();setFabOpen(false);if(kind==='post'){setShowCompose(true);return}if(kind==='task'){setShowTasks(true);return}setAdsTab(kind==='booking'?'bookings':'advertisers');setTab('ads')}
  async function saveTemplate(){buzz();if(!active||!newTplName.trim())return;try{await api.createTemplate(active.id,{name:newTplName.trim(),title:newTitle,text:newText});setNewTplName('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка сохранения шаблона')}}
  async function delTemplate(id:number){buzz();if(!active)return;try{await api.deleteTemplate(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления шаблона')}}
  const canManage=active?.role==='owner'||active?.role==='admin'
@@ -166,7 +169,7 @@ export default function App(){
    </div>)}
   </section>}
 
-  {tab==='overview'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&tab==='overview'&&<>
    {!active&&!loading?<section className="hero"><p>Создайте рабочее пространство агентства.</p><input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',marginBottom:12}}/><button onClick={create}><CirclePlus size={19}/> Создать</button></section>:<>
     <section className="hero"><span className="eyebrow">{active?.role}</span><p style={{marginTop:8}}>{active?.name}</p><div>{spaces.length>1&&<select value={active?.id} onChange={e=>{buzz();setActive(spaces.find(x=>x.id===Number(e.target.value))||null)}}>{spaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select>}</div></section>
     {pending.length>0&&<section className="panel" style={{marginTop:16}}><div className="panel-title"><h2>Обнаруженные каналы</h2><Radio size={20}/></div>{pending.map(p=><article key={p.id} style={{padding:'14px 0',borderBottom:'1px solid var(--border)'}}><strong>{p.title}</strong><p style={{color:'var(--muted)',fontSize:12}}>{p.bot_permissions.can_post_messages?'Публикация разрешена':'Нет права публикации'}</p><button onClick={()=>connect(p.id)} disabled={!p.bot_permissions.can_post_messages}>Подключить</button></article>)}</section>}
@@ -177,37 +180,19 @@ export default function App(){
      {invite&&<div className="invite-box"><p>Токен приглашения: <code>{invite.token}</code></p><p className="hint">Ссылка для сотрудника: <code>https://t.me/channel_desk_bot?start=invite_{invite.token}</code></p><button onClick={copyInvite}>{copied?'Скопировано':'Скопировать токен'}</button></div>}
      {members.length?members.map(m=><div key={m.id} style={{padding:'13px 0',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}><strong>{m.first_name||m.username||`ID ${m.telegram_id}`}</strong><span style={{color:'var(--muted)',fontSize:12}}>{ROLE_LABEL[m.role]||m.role}</span></div>):<div className="empty"><p>Участников пока нет.</p></div>}
     </section>
+    <section className="panel" style={{marginTop:16}}><div className="panel-title"><h2>Ближайшие задачи</h2><CheckCircle2 size={20}/></div>
+     {tasks.filter(t=>t.status!=='done').length===0?<div className="empty"><p>Нет активных задач.</p></div>:tasks.filter(t=>t.status!=='done').slice(0,3).map(tk=><div key={tk.id} style={{padding:'10px 0',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
+      <strong style={{fontSize:13}}>{tk.title}</strong>
+      <span className={"status "+(tk.priority==='urgent'||tk.priority==='high'?'status-changes_requested':'status-in_progress')}>{tk.priority==='urgent'?'Срочно':tk.priority==='high'?'Высокий':'Обычный'}</span>
+     </div>)}
+     {tasks.filter(t=>t.status!=='done').length>3&&<button className="icon-btn" style={{marginTop:10}} onClick={()=>{buzz();setShowTasks(true)}}>Все задачи →</button>}
+    </section>
    </>}
   </>}
 
-  {tab==='calendar'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&tab==='calendar'&&<>
    {!active?<section className="panel"><div className="empty"><div className="empty-icon"><CalendarDays/></div><h3>Создайте рабочее пространство</h3><p>Календарь публикаций появится после создания пространства и подключения канала.</p></div></section>:<>
-    <section id="draft-form" className="panel">
-     <div className="panel-title"><h2>Новый черновик</h2><FileText size={20}/></div>
-     <label className="form-label">Заголовок</label>
-     <input className="field" placeholder="О чём пост?" value={newTitle} onChange={e=>setNewTitle(e.target.value)}/>
-     <label className="form-label">Текст (Telegram HTML: &lt;b&gt;, &lt;i&gt;, &lt;a href=…&gt;)</label>
-     <textarea className="field" rows={4} placeholder="Текст публикации…" value={newText} onChange={e=>setNewText(e.target.value)}/>
-     <label className="form-label">Канал</label>
-     <select className="field" value={draftChannel??''} onChange={e=>setDraftChannel(e.target.value?Number(e.target.value):null)}>
-      <option value="">— без канала —</option>
-      {channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}
-     </select>
-     <label className="form-label">Кнопки (до 8)</label>
-     <div className="btn-row">
-      <input className="field" placeholder="Текст кнопки" value={draftBtnText} onChange={e=>setDraftBtnText(e.target.value)}/>
-      <input className="field" placeholder="https://…" value={draftBtnUrl} onChange={e=>setDraftBtnUrl(e.target.value)}/>
-      <button className="icon-btn" onClick={addDraftBtn} disabled={!draftBtnText.trim()||!draftBtnUrl.trim()} title="Добавить кнопку"><Plus size={16}/></button>
-     </div>
-     {draftBtns.length>0&&<div className="chip-wrap">{draftBtns.map((b,i)=><span key={i} className="btn-chip">🔗 {b.text} <button onClick={()=>{buzz();setDraftBtns(draftBtns.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'var(--danger)',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
-     <label className="form-label">Вложения (фото, видео, документы)</label>
-     <label className="file-btn"><Paperclip size={15}/> Выбрать файлы<input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" style={{display:'none'}} onChange={e=>pickFiles(e.target.files)}/></label>
-     {draftFiles.length>0&&<div className="chip-wrap">{draftFiles.map((f,i)=><span key={i} className="btn-chip">📎 {f.name.length>22?f.name.slice(0,22)+'…':f.name} <button onClick={()=>{buzz();setDraftFiles(draftFiles.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'var(--danger)',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
-     <button className="primary-btn" onClick={createDraft} disabled={busy||!newTitle.trim()}><CirclePlus size={18}/> Создать черновик {draftFiles.length?`(${draftFiles.length} вл.)`:''}</button>
-     {templates.length>0&&<div style={{marginTop:14}}><span style={{color:'var(--muted)',fontSize:12}}>Шаблоны: </span>{templates.map(t=><button key={t.id} onClick={()=>useTemplate(t)} disabled={busy} className="chip-btn">{t.name}</button>)}</div>}
-    </section>
-
-    <section className="panel" style={{marginTop:14}}>
+    <section className="panel">
      <div className="cal-head">
       <button className="icon-btn" onClick={()=>{buzz();setCalMonth(m=>m===0?(setCalYear(y=>y-1),11):m-1)}}><ChevronLeft size={17}/></button>
       <strong>{MONTHS[calMonth]} {calYear}</strong>
@@ -230,27 +215,7 @@ export default function App(){
    </>}
   </>}
 
-  {tab==='create'&&<section className="panel"><div className="panel-title"><h2>Создать</h2><CirclePlus size={20}/></div>
-   {active?<>
-    <button className="invite-btn" onClick={()=>{buzz();setTab('calendar')}}><FileText size={15}/> Новая публикация</button>
-    <button className="invite-btn" disabled style={{opacity:.5}}><Megaphone size={15}/> Рекламный слот (Этап C)</button>
-    <div style={{margin:'18px 0 10px'}}><strong>Сохранить текущий черновик как шаблон</strong></div>
-    <div style={{display:'flex',gap:8}}>
-     <input placeholder="Название шаблона" value={newTplName} onChange={e=>setNewTplName(e.target.value)} style={{flex:1,padding:12,borderRadius:12,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white'}}/>
-     <button onClick={saveTemplate} disabled={busy||!newTplName.trim()||!newText.trim()}>Сохранить</button>
-    </div>
-    {templates.length>0&&<div style={{marginTop:14}}>{templates.map(t=><div key={t.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}><div><strong style={{fontSize:14}}>{t.name}</strong><div style={{color:'var(--muted)',fontSize:12}}>{t.title||'(без заголовка)'}</div></div><div style={{display:'flex',gap:6}}><button onClick={()=>useTemplate(t)} disabled={busy} className="icon-btn"><FileText size={15}/></button><button onClick={()=>delTemplate(t.id)} disabled={busy} className="icon-btn danger"><Trash2 size={15}/></button></div></div>)}</div>}
-    <div style={{margin:'18px 0 10px'}}><strong>Новое рабочее пространство</strong></div>
-    <input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',marginBottom:12}}/>
-    <button onClick={create}><CirclePlus size={19}/> Создать пространство</button>
-   </>:<>
-    <p style={{color:'var(--muted)',fontSize:14}}>Создайте рабочее пространство, чтобы начать работу.</p>
-    <input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',marginBottom:12}}/>
-    <button onClick={create}><CirclePlus size={19}/> Создать</button>
-   </>}
-  </section>}
-
-  {tab==='ads'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&tab==='ads'&&<>
    {!active?<section className="panel"><div className="empty"><div className="empty-icon"><Megaphone/></div><h3>Создайте рабочее пространство</h3><p>Рекламный раздел появится после создания пространства.</p></div></section>:<>
     <section className="panel"><div className="panel-title"><h2>Реклама</h2><Megaphone size={20}/></div>
      <div className="seg">
@@ -339,6 +304,38 @@ export default function App(){
    </>}
   </>}
 
+  {showCompose&&<section id="draft-form" className="panel">
+   <div className="panel-title"><h2>Новый пост</h2><FileText size={20}/></div>
+   <button className="icon-btn" onClick={()=>{buzz();setShowCompose(false)}} style={{marginBottom:10}}>← Назад</button>
+   {!active?<>
+    <p style={{color:'var(--muted)',fontSize:13}}>Создайте рабочее пространство, чтобы публиковать посты.</p>
+    <input className="field" placeholder="Название пространства" value={name} onChange={e=>setName(e.target.value)}/>
+    <button className="primary-btn" onClick={create}><CirclePlus size={18}/> Создать пространство</button>
+   </>:<>
+    <label className="form-label">Заголовок</label>
+    <input className="field" placeholder="О чём пост?" value={newTitle} onChange={e=>setNewTitle(e.target.value)}/>
+    <label className="form-label">Текст (Telegram HTML: &lt;b&gt;, &lt;i&gt;, &lt;a href=…&gt;)</label>
+    <textarea className="field" rows={5} placeholder="Текст публикации…" value={newText} onChange={e=>setNewText(e.target.value)}/>
+    <label className="form-label">Канал</label>
+    <select className="field" value={draftChannel??''} onChange={e=>setDraftChannel(e.target.value?Number(e.target.value):null)}>
+     <option value="">— без канала —</option>
+     {channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}
+    </select>
+    <label className="form-label">Кнопки (до 8)</label>
+    <div className="btn-row">
+     <input className="field" placeholder="Текст кнопки" value={draftBtnText} onChange={e=>setDraftBtnText(e.target.value)}/>
+     <input className="field" placeholder="https://…" value={draftBtnUrl} onChange={e=>setDraftBtnUrl(e.target.value)}/>
+     <button className="icon-btn" onClick={addDraftBtn} disabled={!draftBtnText.trim()||!draftBtnUrl.trim()} title="Добавить кнопку"><Plus size={16}/></button>
+    </div>
+    {draftBtns.length>0&&<div className="chip-wrap">{draftBtns.map((b,i)=><span key={i} className="btn-chip">🔗 {b.text} <button onClick={()=>{buzz();setDraftBtns(draftBtns.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'var(--danger)',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
+    <label className="form-label">Вложения (фото, видео, документы)</label>
+    <label className="file-btn"><Paperclip size={15}/> Выбрать файлы<input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" style={{display:'none'}} onChange={e=>pickFiles(e.target.files)}/></label>
+    {draftFiles.length>0&&<div className="chip-wrap">{draftFiles.map((f,i)=><span key={i} className="btn-chip">📎 {f.name.length>22?f.name.slice(0,22)+'…':f.name} <button onClick={()=>{buzz();setDraftFiles(draftFiles.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'var(--danger)',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
+    <div style={{marginTop:14}}><span style={{color:'var(--muted)',fontSize:12}}>Шаблоны: </span>{templates.length?templates.map(t=><button key={t.id} onClick={()=>useTemplate(t)} disabled={busy} className="chip-btn">{t.name}</button>):<span style={{color:'var(--muted-2)',fontSize:12}}>нет</span>}</div>
+    <button className="primary-btn" onClick={createDraft} disabled={busy||!newTitle.trim()}><CirclePlus size={18}/> Создать черновик {draftFiles.length?`(${draftFiles.length} вл.)`:''}</button>
+   </>}
+  </section>}
+
   {showTasks&&<section className="panel">
    <div className="panel-title"><h2>Задачи</h2><CheckCircle2 size={20}/></div>
    <button className="icon-btn" onClick={()=>{buzz();setShowTasks(false)}} style={{marginBottom:12}}>← Назад</button>
@@ -409,8 +406,7 @@ export default function App(){
     {icon:Megaphone,label:'Каналы',desc:'Управление подключёнными каналами',action:()=>goSection('channels-section')},
     {icon:Users,label:'Команда',desc:'Участники и приглашения',action:()=>goSection('team-section')},
     {icon:CheckCircle2,label:'Задачи',desc:'Задачи и напоминания',action:()=>{buzz();setShowTasks(true)}},
-    {icon:Wallet,label:'Финансы',desc:'Доходы и расходы'},
-    {icon:LineChart,label:'Аналитика',desc:'Отчёты по каналам'},
+    {icon:LineChart,label:'Аналитика',desc:'Отчёты по каналам',action:()=>{buzz();setAdsTab('finance');setTab('ads')}},
     {icon:ImageIcon,label:'Медиакиты',desc:'Презентация для рекламодателей',action:()=>{buzz();setShowMediaKits(true)}},
     {icon:Settings,label:'Настройки',desc:'Пространство и уведомления'},
    ].map(item=>{
@@ -425,5 +421,17 @@ export default function App(){
   </section>}
 
   <div className="ver">ChannelDesk {APP_VERSION}</div>
- </main><nav>{([[BarChart3,'Обзор','overview'],[CalendarDays,'Календарь','calendar'],[CirclePlus,'Создать','create'],[Megaphone,'Реклама','ads'],[MoreHorizontal,'Ещё','more']] as [typeof BarChart3,string,Tab][]).map(([Icon,label,t])=>{const C=Icon as typeof BarChart3;return <button key={label} className={tab===t?'active':''} onClick={()=>{buzz();setTab(t)}}><C size={21}/><span>{label}</span></button>})}</nav></div>
+ </main><nav>{([[BarChart3,'Обзор','overview'],[CalendarDays,'Календарь','calendar'],[Megaphone,'Реклама','ads'],[MoreHorizontal,'Ещё','more']] as [typeof BarChart3,string,Tab][]).map(([Icon,label,t])=>{const C=Icon as typeof BarChart3;return <button key={label} className={tab===t?'active':''} onClick={()=>{buzz();setTab(t)}}><C size={21}/><span>{label}</span></button>})}
+  <button className="fab" onClick={()=>{buzz();setFabOpen(!fabOpen)}} title="Создать"><CirclePlus size={26}/><span>Создать</span></button>
+ </nav>
+ {fabOpen&&<div className="fab-overlay" onClick={()=>setFabOpen(false)}>
+  <div className="fab-sheet" onClick={e=>e.stopPropagation()}>
+   <div className="panel-title"><h2>Что создаём?</h2><button className="icon-btn" onClick={()=>setFabOpen(false)}><X size={15}/></button></div>
+   <button className="fab-item" onClick={()=>openCreate('post')}><span className="menu-icon"><FileText size={19}/></span><span className="menu-body"><strong>Новый пост</strong><span>Текст, кнопки, вложения</span></span></button>
+   <button className="fab-item" onClick={()=>openCreate('booking')}><span className="menu-icon"><Megaphone size={19}/></span><span className="menu-body"><strong>Рекламная бронь</strong><span>Рекламодатель, канал, цена</span></span></button>
+   <button className="fab-item" onClick={()=>openCreate('task')}><span className="menu-icon"><CheckCircle2 size={19}/></span><span className="menu-body"><strong>Задача</strong><span>Для команды, со сроком</span></span></button>
+   <button className="fab-item" onClick={()=>openCreate('advertiser')}><span className="menu-icon"><Users size={19}/></span><span className="menu-body"><strong>Рекламодатель</strong><span>Новый клиент</span></span></button>
+  </div>
+ </div>}
+ </div>
 }
