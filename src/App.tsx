@@ -2,7 +2,7 @@ import { useCallback,useEffect,useState } from 'react'
 import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download } from 'lucide-react'
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit,type Task } from './api'
 
-const APP_VERSION = 'v0.18.1'
+const APP_VERSION = 'v0.18.2'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
@@ -49,6 +49,8 @@ export default function App(){
  const [showMediaKits,setShowMediaKits]=useState(false)
  const [fabOpen,setFabOpen]=useState(false)
  const [showCompose,setShowCompose]=useState(false)
+ const [showBookingForm,setShowBookingForm]=useState(false)
+ const [showAdvForm,setShowAdvForm]=useState(false)
  const [tasks,setTasks]=useState<Task[]>([])
  const [showTasks,setShowTasks]=useState(false)
  const [taskTitle,setTaskTitle]=useState(''),[taskDesc,setTaskDesc]=useState(''),[taskPriority,setTaskPriority]=useState('normal'),[taskDue,setTaskDue]=useState('')
@@ -88,7 +90,7 @@ export default function App(){
  async function addCommentTo(id:number){buzz();if(!active||!commentText.trim())return;const w=active.id;try{await api.addComment(w,id,commentText.trim());setCommentText('');const cm=await api.comments(w,id);setComments(prev=>({...prev,[id]:cm}))}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления комментария')}}
  async function addButtonTo(id:number){buzz();if(!active||!btnText.trim()||!btnUrl.trim())return;const w=active.id;try{const post=posts.find(p=>p.id===id);const cur=post?.buttons||[];const next=[...cur,[{text:btnText.trim(),url:btnUrl.trim()}]];await api.updatePost(w,id,{buttons:next});setBtnText('');setBtnUrl('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления кнопки')}}
  async function useTemplate(t:Template){buzz();setNewTitle(t.title);setNewText(t.text);setFabOpen(false);setShowCompose(true);setTimeout(()=>{document.getElementById('draft-form')?.scrollIntoView({behavior:'smooth'})},80)}
- function openCreate(kind:'post'|'booking'|'task'|'advertiser'){buzz();setFabOpen(false);if(kind==='post'){setShowCompose(true);return}if(kind==='task'){setShowTasks(true);return}setTab('ads')}
+ function openCreate(kind:'post'|'booking'|'task'|'advertiser'){buzz();setFabOpen(false);if(kind==='post'){setShowCompose(true);return}if(kind==='task'){setShowTasks(true);return}if(kind==='booking'){setShowBookingForm(true);return}setShowAdvForm(true)}
  async function saveTemplate(){buzz();if(!active||!newTplName.trim())return;try{await api.createTemplate(active.id,{name:newTplName.trim(),title:newTitle,text:newText});setNewTplName('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка сохранения шаблона')}}
  async function delTemplate(id:number){buzz();if(!active)return;try{await api.deleteTemplate(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления шаблона')}}
  const canManage=active?.role==='owner'||active?.role==='admin'
@@ -168,7 +170,7 @@ export default function App(){
    </div>)}
   </section>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&tab==='overview'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&!showBookingForm&&!showAdvForm&&tab==='overview'&&<>
    {!active&&!loading?<section className="hero"><p>Создайте рабочее пространство агентства.</p><input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',marginBottom:12}}/><button onClick={create}><CirclePlus size={19}/> Создать</button></section>:<>
     <section className="hero"><span className="eyebrow">{active?.role}</span><p style={{marginTop:8}}>{active?.name}</p><div>{spaces.length>1&&<select value={active?.id} onChange={e=>{buzz();setActive(spaces.find(x=>x.id===Number(e.target.value))||null)}}>{spaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select>}</div></section>
     {pending.length>0&&<section className="panel" style={{marginTop:16}}><div className="panel-title"><h2>Обнаруженные каналы</h2><Radio size={20}/></div>{pending.map(p=><article key={p.id} style={{padding:'14px 0',borderBottom:'1px solid var(--border)'}}><strong>{p.title}</strong><p style={{color:'var(--muted)',fontSize:12}}>{p.bot_permissions.can_post_messages?'Публикация разрешена':'Нет права публикации'}</p><button onClick={()=>connect(p.id)} disabled={!p.bot_permissions.can_post_messages}>Подключить</button></article>)}</section>}
@@ -189,7 +191,7 @@ export default function App(){
    </>}
   </>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&tab==='calendar'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&!showBookingForm&&!showAdvForm&&tab==='calendar'&&<>
    {!active?<section className="panel"><div className="empty"><div className="empty-icon"><CalendarDays/></div><h3>Создайте рабочее пространство</h3><p>Календарь публикаций появится после создания пространства и подключения канала.</p></div></section>:<>
     <section className="panel">
      <div className="cal-head">
@@ -214,7 +216,7 @@ export default function App(){
    </>}
   </>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&tab==='ads'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&!showBookingForm&&!showAdvForm&&tab==='ads'&&<>
    {!active?<section className="panel"><div className="empty"><div className="empty-icon"><Megaphone/></div><h3>Создайте рабочее пространство</h3><p>Рекламный раздел появится после создания пространства.</p></div></section>:<>
     <section className="panel"><div className="panel-title"><h2>Клиенты</h2><Users size={20}/></div>
      <p style={{color:'var(--muted)',fontSize:12,margin:'4px 0 0'}}>Рекламодатели и активные размещения. Создание — через «+» внизу.</p>
@@ -253,7 +255,143 @@ export default function App(){
    </>}
   </>}
 
-  {!showMediaKits&&!showTasks&&tab==='more'&&<section className="panel"><div className="panel-title"><h2>Ещё</h2><MoreHorizontal size={20}/></div>
+  {showCompose&&<section id="draft-form" className="panel">
+   <div className="panel-title"><h2>Новый пост</h2><FileText size={20}/></div>
+   <button className="icon-btn" onClick={()=>{buzz();setShowCompose(false)}} style={{marginBottom:10}}>← Назад</button>
+   {!active?<>
+    <p style={{color:'var(--muted)',fontSize:13}}>Создайте рабочее пространство, чтобы публиковать посты.</p>
+    <input className="field" placeholder="Название пространства" value={name} onChange={e=>setName(e.target.value)}/>
+    <button className="primary-btn" onClick={create}><CirclePlus size={18}/> Создать пространство</button>
+   </>:<>
+    <label className="form-label">Заголовок</label>
+    <input className="field" placeholder="О чём пост?" value={newTitle} onChange={e=>setNewTitle(e.target.value)}/>
+    <label className="form-label">Текст (Telegram HTML: &lt;b&gt;, &lt;i&gt;, &lt;a href=…&gt;)</label>
+    <textarea className="field" rows={5} placeholder="Текст публикации…" value={newText} onChange={e=>setNewText(e.target.value)}/>
+    <label className="form-label">Канал</label>
+    <select className="field" value={draftChannel??''} onChange={e=>setDraftChannel(e.target.value?Number(e.target.value):null)}>
+     <option value="">— без канала —</option>
+     {channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}
+    </select>
+    <label className="form-label">Кнопки (до 8)</label>
+    <div className="btn-row">
+     <input className="field" placeholder="Текст кнопки" value={draftBtnText} onChange={e=>setDraftBtnText(e.target.value)}/>
+     <input className="field" placeholder="https://…" value={draftBtnUrl} onChange={e=>setDraftBtnUrl(e.target.value)}/>
+     <button className="icon-btn" onClick={addDraftBtn} disabled={!draftBtnText.trim()||!draftBtnUrl.trim()} title="Добавить кнопку"><Plus size={16}/></button>
+    </div>
+    {draftBtns.length>0&&<div className="chip-wrap">{draftBtns.map((b,i)=><span key={i} className="btn-chip">🔗 {b.text} <button onClick={()=>{buzz();setDraftBtns(draftBtns.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'var(--danger)',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
+    <label className="form-label">Вложения (фото, видео, документы)</label>
+    <label className="file-btn"><Paperclip size={15}/> Выбрать файлы<input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" style={{display:'none'}} onChange={e=>pickFiles(e.target.files)}/></label>
+    {draftFiles.length>0&&<div className="chip-wrap">{draftFiles.map((f,i)=><span key={i} className="btn-chip">📎 {f.name.length>22?f.name.slice(0,22)+'…':f.name} <button onClick={()=>{buzz();setDraftFiles(draftFiles.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'var(--danger)',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
+    <div style={{marginTop:14}}><span style={{color:'var(--muted)',fontSize:12}}>Шаблоны: </span>{templates.length?templates.map(t=><button key={t.id} onClick={()=>useTemplate(t)} disabled={busy} className="chip-btn">{t.name}</button>):<span style={{color:'var(--muted-2)',fontSize:12}}>нет</span>}</div>
+    <button className="primary-btn" onClick={createDraft} disabled={busy||!newTitle.trim()}><CirclePlus size={18}/> Создать черновик {draftFiles.length?`(${draftFiles.length} вл.)`:''}</button>
+   </>}
+  </section>}
+
+    {showBookingForm&&<section className="panel">
+   <div className="panel-title"><h2>Новая бронь</h2><Megaphone size={20}/></div>
+   <button className="icon-btn" onClick={()=>{buzz();setShowBookingForm(false)}} style={{marginBottom:10}}>← Назад</button>
+   <label className="form-label">Рекламодатель</label>
+   <select className="field" value={bkAdv??''} onChange={e=>setBkAdv(e.target.value?Number(e.target.value):null)}>
+    <option value="">— выберите —</option>
+    {advertisers.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+   </select>
+   <label className="form-label">Канал</label>
+   <select className="field" value={bkChannel??''} onChange={e=>setBkChannel(e.target.value?Number(e.target.value):null)}>
+    <option value="">— без канала —</option>
+    {channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}
+   </select>
+   <div className="btn-row" style={{marginTop:14}}>
+    <input className="field" placeholder="Стоимость, ₽" type="number" value={bkCost} onChange={e=>setBkCost(e.target.value)}/>
+    <input className="field" placeholder="Дата" type="date" value={bkDate} onChange={e=>setBkDate(e.target.value)}/>
+   </div>
+   <label className="form-label" style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}}>
+    <input type="checkbox" checked={bkNoErid} onChange={e=>setBkNoErid(e.target.checked)} style={{width:18,height:18,accentColor:'var(--accent-2)'}}/>
+    <span>ERID не требуется (обычный Telegram-канал)</span>
+   </label>
+   {!bkNoErid&&<>
+    <label className="form-label">ERID</label>
+    <input className="field" placeholder="erid: …" value={bkErid} onChange={e=>setBkErid(e.target.value)}/>
+   </>}
+   <button className="primary-btn" onClick={async()=>{await addBooking();setShowBookingForm(false)}} disabled={!bkAdv}><Megaphone size={17}/> Создать бронь</button>
+  </section>}
+
+  {showAdvForm&&<section className="panel">
+   <div className="panel-title"><h2>Новый рекламодатель</h2><Users size={20}/></div>
+   <button className="icon-btn" onClick={()=>{buzz();setShowAdvForm(false)}} style={{marginBottom:10}}>← Назад</button>
+   <label className="form-label">Название / компания</label>
+   <input className="field" placeholder="ООО Реклама" value={advName} onChange={e=>setAdvName(e.target.value)}/>
+   <label className="form-label">Контакты</label>
+   <input className="field" placeholder="@telegram, телефон, email…" value={advContact} onChange={e=>setAdvContact(e.target.value)} style={{marginTop:10}}/>
+   <button className="primary-btn" onClick={async()=>{await addAdvertiser();setShowAdvForm(false)}} disabled={!advName.trim()}><Plus size={17}/> Добавить рекламодателя</button>
+  </section>}
+
+{showTasks&&<section className="panel">
+   <div className="panel-title"><h2>Задачи</h2><CheckCircle2 size={20}/></div>
+   <button className="icon-btn" onClick={()=>{buzz();setShowTasks(false)}} style={{marginBottom:12}}>← Назад</button>
+   <label className="form-label">Новая задача</label>
+   <input className="field" placeholder="Что нужно сделать?" value={taskTitle} onChange={e=>setTaskTitle(e.target.value)}/>
+   <textarea className="field" rows={2} placeholder="Описание…" value={taskDesc} onChange={e=>setTaskDesc(e.target.value)} style={{marginTop:10}}/>
+   <div className="btn-row" style={{marginTop:10}}>
+    <select className="field" value={taskPriority} onChange={e=>setTaskPriority(e.target.value)}>
+     <option value="low">Низкий</option><option value="normal">Обычный</option><option value="high">Высокий</option><option value="urgent">Срочный</option>
+    </select>
+    <input className="field" placeholder="Срок (дата)" type="date" value={taskDue} onChange={e=>setTaskDue(e.target.value)}/>
+   </div>
+   <button className="primary-btn" onClick={addTask} disabled={!taskTitle.trim()}><Plus size={17}/> Создать задачу</button>
+   <div style={{marginTop:18}}>
+    {tasks.length===0?<div className="empty"><p>Задач пока нет.</p></div>:tasks.map(tk=><article key={tk.id} style={{padding:'13px 0',borderBottom:'1px solid var(--border)'}}>
+     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
+      <strong style={{fontSize:14,textDecoration:tk.status==='done'?'line-through':'none',opacity:tk.status==='done'?.6:1}}>{tk.title}</strong>
+      <span className={"status "+(tk.status==='done'?'status-published':tk.priority==='urgent'||tk.priority==='high'?'status-changes_requested':'status-scheduled')}>{tk.status==='done'?'Готово':tk.priority==='urgent'?'Срочно':tk.priority==='high'?'Высокий':'Обычный'}</span>
+     </div>
+     {tk.description&&<p style={{color:'var(--muted)',fontSize:12,margin:'6px 0 0'}}>{tk.description}</p>}
+     <p style={{color:'var(--muted-2)',fontSize:11,margin:'4px 0 0'}}>
+      {tk.due_at?`Срок: ${fmtDate(tk.due_at)}`:''}
+      {tk.assignee_first_name?` · Исполнитель: ${tk.assignee_first_name}`:''}
+     </p>
+     <div style={{display:'flex',gap:8,marginTop:10}}>
+      {tk.status!=='done'&&<button onClick={()=>completeTask(tk.id)} disabled={busy}>✓ Выполнено</button>}
+      <button onClick={()=>delTask(tk.id)} disabled={busy} style={{opacity:.7}}>Удалить</button>
+     </div>
+    </article>)}
+   </div>
+  </section>}
+
+  {showMediaKits&&<section className="panel">
+   <div className="panel-title"><h2>Медиакиты</h2><ImageIcon size={20}/></div>
+   <button className="icon-btn" onClick={()=>{buzz();setShowMediaKits(false)}} style={{marginBottom:12}}>← Назад</button>
+   <label className="form-label">Название</label>
+   <input className="field" placeholder="Медиакит канала «Новости»" value={mkName} onChange={e=>setMkName(e.target.value)}/>
+   <label className="form-label">Канал</label>
+   <select className="field" value={mkChannel??''} onChange={e=>setMkChannel(e.target.value?Number(e.target.value):null)}>
+    <option value="">— без канала —</option>
+    {channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}
+   </select>
+   <label className="form-label">Описание</label>
+   <textarea className="field" rows={2} placeholder="О канале, аудитории…" value={mkDesc} onChange={e=>setMkDesc(e.target.value)}/>
+   <div className="btn-row" style={{marginTop:14}}>
+    <input className="field" placeholder="Подписчики" type="number" value={mkSubs} onChange={e=>setMkSubs(e.target.value)}/>
+    <input className="field" placeholder="Цена поста, ₽" type="number" value={mkPrice} onChange={e=>setMkPrice(e.target.value)}/>
+   </div>
+   <button className="primary-btn" onClick={addMediaKit} disabled={!mkName.trim()}><Plus size={17}/> Создать медиакит</button>
+   <div style={{marginTop:18}}>
+    {mediaKits.length===0?<div className="empty"><p>Медиакитов пока нет.</p></div>:mediaKits.map(k=><article key={k.id} style={{padding:'13px 0',borderBottom:'1px solid var(--border)'}}>
+     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
+      <strong style={{fontSize:14}}>{k.name}</strong>
+      <button onClick={()=>delMediaKit(k.id)} disabled={busy} className="icon-btn danger" title="Удалить"><Trash2 size={14}/></button>
+     </div>
+     <p style={{color:'var(--muted)',fontSize:12,margin:'6px 0 0'}}>
+      {k.channel_title||'без канала'}
+      {k.stats&&typeof k.stats==='object'&&'subscribers' in k.stats&&(k.stats as Record<string,number>).subscribers?` · ${Number((k.stats as Record<string,number>).subscribers).toLocaleString('ru-RU')} подписчиков`:''}
+     </p>
+     {k.description&&<p style={{fontSize:13,margin:'6px 0 0',color:'var(--text-2)'}}>{k.description}</p>}
+     {Array.isArray(k.pricing)&&k.pricing.length>0&&<p style={{color:'var(--accent-2)',fontSize:12,margin:'6px 0 0'}}>{(k.pricing[0] as {format?:string;price?:number}).format||'пост'}: {(k.pricing[0] as {price?:number}).price?.toLocaleString('ru-RU')} ₽</p>}
+    </article>)}
+   </div>
+  </section>}
+
+
+  {!showMediaKits&&!showTasks&&!showCompose&&!showBookingForm&&!showAdvForm&&tab==='more'&&<section className="panel"><div className="panel-title"><h2>Ещё</h2><MoreHorizontal size={20}/></div>
    {[
     {icon:Megaphone,label:'Каналы',desc:'Управление подключёнными каналами',action:()=>goSection('channels-section')},
     {icon:Users,label:'Команда',desc:'Участники и приглашения',action:()=>goSection('team-section')},
