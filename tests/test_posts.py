@@ -126,6 +126,67 @@ def test_schedule_requires_channel(monkeypatch):
     assert 'канал' in r.json()['detail'].lower()
 
 
+def test_reschedule_from_scheduled_allowed(monkeypatch):
+    scheduled = dict(POST_ROW, status='scheduled', publish_key='abc123')
+    rescheduled = dict(POST_ROW, status='scheduled', publish_key='abc123', scheduled_at='2026-08-04T11:00:00Z')
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, scheduled, rescheduled])
+    monkeypatch.setattr('api.posts.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/posts/10/schedule',
+                    json={'scheduled_at': '2026-08-04T11:00:00Z'}, headers=auth_headers())
+    assert r.status_code == 200
+    assert r.json()['status'] == 'scheduled'
+    assert r.json()['publish_key'] == 'abc123'  # ключ сохраняется
+
+
+def test_reschedule_from_failed_allowed(monkeypatch):
+    failed = dict(POST_ROW, status='failed', publish_key='key1', attempt_count=5, last_error='HTTP 400')
+    rescheduled = dict(POST_ROW, status='scheduled', publish_key='key1', attempt_count=0, last_error=None)
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, failed, rescheduled])
+    monkeypatch.setattr('api.posts.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/posts/10/publish-now', headers=auth_headers())
+    assert r.status_code == 200
+    assert r.json()['status'] == 'scheduled'
+    assert r.json()['attempt_count'] == 0
+
+
+def test_reschedule_from_cancelled_allowed(monkeypatch):
+    cancelled = dict(POST_ROW, status='cancelled')
+    rescheduled = dict(POST_ROW, status='scheduled', publish_key='newkey')
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, cancelled, rescheduled])
+    monkeypatch.setattr('api.posts.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/posts/10/publish-now', headers=auth_headers())
+    assert r.status_code == 200
+    assert r.json()['status'] == 'scheduled'
+
+
+def test_schedule_from_review_rejected(monkeypatch):
+    review = dict(POST_ROW, status='review')
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, review])
+    monkeypatch.setattr('api.posts.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/posts/10/publish-now', headers=auth_headers())
+    assert r.status_code == 422
+    assert 'одобрени' in r.json()['detail']
+
+
+def test_draft_without_approval_can_schedule(monkeypatch):
+    draft = dict(POST_ROW, status='draft', approval_required=False)
+    scheduled = dict(POST_ROW, status='scheduled', publish_key='dkey')
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, draft, scheduled])
+    monkeypatch.setattr('api.posts.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/posts/10/publish-now', headers=auth_headers())
+    assert r.status_code == 200
+    assert r.json()['status'] == 'scheduled'
+
+
+def test_draft_with_approval_rejected(monkeypatch):
+    draft = dict(POST_ROW, status='draft', approval_required=True)
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, draft])
+    monkeypatch.setattr('api.posts.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/posts/10/publish-now', headers=auth_headers())
+    assert r.status_code == 422
+    assert 'одобрени' in r.json()['detail']
+
+
 def test_publish_now_sets_scheduled(monkeypatch):
     approved = dict(POST_ROW, status='approved')
     scheduled = dict(POST_ROW, status='scheduled', publish_key='nowkey', scheduled_at=None)

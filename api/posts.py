@@ -222,12 +222,19 @@ def schedule_post(workspace_id: int, post_id: int, payload: SchedulePayload, use
         post = _get_post(cur, workspace_id, post_id)
         if not post['channel_id']:
             raise HTTPException(422, 'Укажите канал перед планированием')
-        # Публикацию можно планировать из approved или (если согласование выключено) из черновика.
-        if post['status'] not in {'approved', 'draft', 'in_progress'}:
-            raise HTTPException(422, 'Планировать можно только одобренную публикацию')
-        if post['status'] != 'approved' and post['approval_required']:
-            raise HTTPException(422, 'Требуется согласование: сначала одобрьте публикацию')
+        # Планировать/публиковать можно:
+        #  - одобренную публикацию;
+        #  - уже запланированную (повторный «Опубликовать сейчас»);
+        #  - упавшую (retry) или отменённую (возобновить);
+        #  - черновик, если согласование выключено.
+        reschedulable = {'approved', 'scheduled', 'failed', 'cancelled'}
+        if post['status'] not in reschedulable:
+            if post['status'] in {'draft', 'in_progress'} and not post['approval_required']:
+                pass
+            else:
+                raise HTTPException(422, 'Опубликовать можно после одобрения: переведите пост на согласование и одобрьте его')
         scheduled_at = payload.scheduled_at or datetime.now(timezone.utc)
+        # Сохраняем существующий publish_key (идемпотентность), сбрасываем счётчик попыток.
         publish_key = post.get('publish_key') or uuid.uuid4().hex
         cur.execute("""UPDATE cd_posts SET status='scheduled',scheduled_at=%s,publish_key=%s,
         last_error=NULL,attempt_count=0,updated_at=now() WHERE id=%s RETURNING *""",
