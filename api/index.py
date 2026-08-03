@@ -43,7 +43,16 @@ def health():
     return {'ok': True, 'service': 'ChannelDesk API', 'version': '0.11.0'}
 
 
-@app.get('/api/health/storage')
+@app.get('/api/health/migrations')
+def health_migrations():
+    """Список применённых миграций из schema_migrations (через БД — работает)."""
+    try:
+        from api.db import connect
+        with connect() as conn, conn.cursor() as cur:
+            cur.execute('SELECT version, applied_at FROM schema_migrations ORDER BY applied_at')
+            return {'ok': True, 'migrations': cur.fetchall()}
+    except Exception as exc:
+        return {'ok': False, 'error': str(exc)}
 def health_storage():
     """Диагностика хранилища (прямая загрузка из браузера).
 
