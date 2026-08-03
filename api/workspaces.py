@@ -98,6 +98,21 @@ def update_workspace(workspace_id: int, payload: WorkspaceUpdate, user: dict = D
         return {**ws, 'role': member['role'], 'channel_scope': member['channel_scope']}
 
 
+@router.delete('/workspaces/{workspace_id}', status_code=204)
+def delete_workspace(workspace_id: int, user: dict = Depends(current_user)):
+    """Удаляет рабочее пространство (только владелец). Каскадно удаляет всё содержимое."""
+    member = membership(user['id'], workspace_id)
+    require_roles(member, 'owner')
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute('SELECT id FROM cd_workspaces WHERE id=%s AND owner_user_id=%s AND is_active=true',
+                    (workspace_id, user['id']))
+        if not cur.fetchone():
+            raise HTTPException(403, 'Удалить рабочее пространство может только его владелец')
+        audit(cur, workspace_id, user['id'], 'workspace.deleted', 'workspace', workspace_id)
+        cur.execute('UPDATE cd_workspaces SET is_active=false,updated_at=now() WHERE id=%s', (workspace_id,))
+        return None
+
+
 @router.get('/workspaces/{workspace_id}/members')
 def members(workspace_id: int, user: dict = Depends(current_user)):
     member = membership(user['id'], workspace_id)

@@ -87,3 +87,21 @@ class FakeConnWithMember:
 
     def __exit__(self, *args):
         return False
+
+
+def test_delete_workspace_by_owner(monkeypatch):
+    owner = {'id': 2, 'workspace_id': 3, 'user_id': 1, 'role': 'owner', 'status': 'active', 'channel_scope': []}
+    conn = patch_db(monkeypatch, [USER_ROW, owner, {'id': 3}])
+    monkeypatch.setattr('api.workspaces.connect', lambda: conn)
+    r = client.delete('/api/workspaces/3', headers=auth_headers())
+    assert r.status_code == 204
+    calls = [call for cur in conn.cursors for call in cur.calls]
+    assert any('is_active=false' in sql for sql, _ in calls)
+
+
+def test_delete_workspace_requires_owner(monkeypatch):
+    admin = {'id': 2, 'workspace_id': 3, 'user_id': 1, 'role': 'admin', 'status': 'active', 'channel_scope': []}
+    conn = patch_db(monkeypatch, [USER_ROW, admin])
+    monkeypatch.setattr('api.workspaces.connect', lambda: conn)
+    r = client.delete('/api/workspaces/3', headers=auth_headers())
+    assert r.status_code == 403

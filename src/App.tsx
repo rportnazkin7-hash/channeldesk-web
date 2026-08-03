@@ -2,7 +2,7 @@ import { useCallback,useEffect,useState } from 'react'
 import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download } from 'lucide-react'
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit,type Task } from './api'
 
-const APP_VERSION = 'v0.19.1'
+const APP_VERSION = 'v0.20.0'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
@@ -34,7 +34,7 @@ function errorHint(msg:string):string{
 
 export default function App(){
  const [tab,setTab]=useState<Tab>('overview')
- const [spaces,setSpaces]=useState<Workspace[]>([]),[active,setActive]=useState<Workspace|null>(null),[pending,setPending]=useState<Pending[]>([]),[channels,setChannels]=useState<Channel[]>([]),[members,setMembers]=useState<Member[]>([]),[invite,setInvite]=useState<Invite|null>(null),[copied,setCopied]=useState(false),[joined,setJoined]=useState<{workspace_name:string;role:string}|null>(null),[exportMsg,setExportMsg]=useState(''),[exportJobs,setExportJobs]=useState<Awaited<ReturnType<typeof api.exportsStatus>>>([]),[name,setName]=useState('Моё агентство'),[error,setError]=useState(''),[loading,setLoading]=useState(true)
+ const [spaces,setSpaces]=useState<Workspace[]>([]),[activeId,setActiveId]=useState<number|null>(null),[pending,setPending]=useState<Pending[]>([]),[channels,setChannels]=useState<Channel[]>([]),[members,setMembers]=useState<Member[]>([]),[invite,setInvite]=useState<Invite|null>(null),[copied,setCopied]=useState(false),[joined,setJoined]=useState<{workspace_name:string;role:string}|null>(null),[exportMsg,setExportMsg]=useState(''),[exportJobs,setExportJobs]=useState<Awaited<ReturnType<typeof api.exportsStatus>>>([]),[name,setName]=useState('Моё агентство'),[error,setError]=useState(''),[loading,setLoading]=useState(true)
  const [posts,setPosts]=useState<Post[]>([]),[newTitle,setNewTitle]=useState(''),[newText,setNewText]=useState(''),[draftChannel,setDraftChannel]=useState<number|null>(null),[busy,setBusy]=useState(false)
  const [draftBtns,setDraftBtns]=useState<Button[]>([]),[draftBtnText,setDraftBtnText]=useState(''),[draftBtnUrl,setDraftBtnUrl]=useState(''),[draftFiles,setDraftFiles]=useState<File[]>([])
  const [calYear,setCalYear]=useState(new Date().getFullYear()),[calMonth,setCalMonth]=useState(new Date().getMonth()),[selectedDay,setSelectedDay]=useState<Date|null>(null)
@@ -50,6 +50,9 @@ export default function App(){
  const [fabOpen,setFabOpen]=useState(false)
  const [showCompose,setShowCompose]=useState(false)
  const [showBookingForm,setShowBookingForm]=useState(false)
+ const active=spaces.find(x=>x.id===activeId)||spaces[0]||null
+ const [showSettings,setShowSettings]=useState(false)
+ const [confirmDelete,setConfirmDelete]=useState(false)
  const [bookingTab,setBookingTab]=useState<'future'|'active'|'history'>('future')
  const [showAdvForm,setShowAdvForm]=useState(false)
  const [tasks,setTasks]=useState<Task[]>([])
@@ -58,9 +61,9 @@ export default function App(){
  const [mkName,setMkName]=useState(''),[mkChannel,setMkChannel]=useState<number|null>(null),[mkDesc,setMkDesc]=useState(''),[mkSubs,setMkSubs]=useState(''),[mkPrice,setMkPrice]=useState('')
  const hasInitData=!!(window.Telegram?.WebApp?.initData)
 
- async function load(){setLoading(true);setError('');try{const s=await api.workspaces();setSpaces(s);const a=active&&s.some(x=>x.id===active.id)?active:s[0]||null;setActive(a);const [p,c,m,po,t,ad,bk,fs,mk,ts]=await Promise.all([api.pending(),a?api.channels(a.id):Promise.resolve([]),a?api.members(a.id):Promise.resolve([]),a?api.posts(a.id):Promise.resolve([]),a?api.templates(a.id):Promise.resolve([]),a?api.advertisers(a.id):Promise.resolve([]),a?api.bookings(a.id):Promise.resolve([]),a?api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1):Promise.resolve(null),a?api.mediaKits(a.id):Promise.resolve([]),a?api.tasks(a.id):Promise.resolve([])]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFinSummary(fs);setMediaKits(mk);setTasks(ts);setOpenPost(null)}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки')}finally{setLoading(false)}}
+ async function load(){setLoading(true);setError('');try{const s=await api.workspaces();setSpaces(s);const a=s.find(x=>x.id===activeId)||s[0]||null;setActiveId(a?a.id:null);const [p,c,m,po,t,ad,bk,fs,mk,ts]=await Promise.all([api.pending(),a?api.channels(a.id):Promise.resolve([]),a?api.members(a.id):Promise.resolve([]),a?api.posts(a.id):Promise.resolve([]),a?api.templates(a.id):Promise.resolve([]),a?api.advertisers(a.id):Promise.resolve([]),a?api.bookings(a.id):Promise.resolve([]),a?api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1):Promise.resolve(null),a?api.mediaKits(a.id):Promise.resolve([]),a?api.tasks(a.id):Promise.resolve([])]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFinSummary(fs);setMediaKits(mk);setTasks(ts);setOpenPost(null)}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки')}finally{setLoading(false)}}
  // Тихий фоновый poll: обновляет данные без индикатора загрузки и без сброса открытых карточек.
- const refresh=useCallback(async ()=>{try{const s=await api.workspaces();const a=active&&s.some(x=>x.id===active.id)?active:s[0]||null;if(!a)return;const [p,c,m,po,t,ad,bk,fs,mk,ts]=await Promise.all([api.pending(),api.channels(a.id),api.members(a.id),api.posts(a.id),api.templates(a.id),api.advertisers(a.id),api.bookings(a.id),api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1),api.mediaKits(a.id),api.tasks(a.id)]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFinSummary(fs);setMediaKits(mk);setTasks(ts);setSpaces(s);setActive(a)}catch{/* фоновая ошибка не должна тревожить пользователя */}},[active])
+ const refresh=useCallback(async ()=>{try{const s=await api.workspaces();const a=s.find(x=>x.id===activeId)||s[0]||null;if(!a)return;const [p,c,m,po,t,ad,bk,fs,mk,ts]=await Promise.all([api.pending(),api.channels(a.id),api.members(a.id),api.posts(a.id),api.templates(a.id),api.advertisers(a.id),api.bookings(a.id),api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1),api.mediaKits(a.id),api.tasks(a.id)]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFinSummary(fs);setMediaKits(mk);setTasks(ts);setSpaces(s)}catch{/* фоновая ошибка не должна тревожить пользователя */}},[activeId])
  useEffect(()=>{const timer=setInterval(()=>{refresh()},3000);return ()=>clearInterval(timer)},[refresh])
  async function addAdvertiser(){buzz();if(!active)return;setError('');try{await api.createAdvertiser(active.id,{name:advName,notes:advContact});setAdvName('');setAdvContact('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления рекламодателя')}}
  async function delAdvertiser(id:number){buzz();if(!active)return;try{await api.deleteAdvertiser(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления рекламодателя')}}
@@ -73,6 +76,7 @@ export default function App(){
  async function addTask(){buzz();if(!active)return;setError('');try{await api.createTask(active.id,{title:taskTitle,description:taskDesc,priority:taskPriority,due_at:taskDue?new Date(taskDue).toISOString():null});setTaskTitle('');setTaskDesc('');setTaskPriority('normal');setTaskDue('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания задачи')}}
  async function completeTask(id:number){buzz();if(!active)return;try{await api.completeTask(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка отметки задачи')}}
  async function delTask(id:number){buzz();if(!active)return;try{await api.deleteTask(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления задачи')}}
+ async function doDeleteWorkspace(){if(!active)return;setBusy(true);setError('');try{await api.deleteWorkspace(active.id);setConfirmDelete(false);setShowSettings(false);const s=await api.workspaces();setSpaces(s);setActiveId(s.length?s[0].id:null);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления агентства');setConfirmDelete(false)}finally{setBusy(false)}}
  async function sendExport(kind:'posts'|'bookings'|'finance',format:'csv'|'xlsx'|'pdf'){buzz();if(!active)return;setExportMsg('');try{const r=await api.requestExport(active.id,kind,format);setExportMsg(`Файл ${kind}.${format} будет отправлен ботом в Telegram в течение ~30 секунд`);setTimeout(()=>setExportMsg(''),8000);checkExports()}catch(e){setError(e instanceof Error?e.message:'Ошибка экспорта')}}
  async function checkExports(){if(!active)return;try{const j=await api.exportsStatus(active.id);setExportJobs(j)}catch{}}
  useEffect(()=>{const sp=window.Telegram?.WebApp?.initDataUnsafe?.start_param||'';if(sp.startsWith('invite_')){api.acceptInvite(sp.slice('invite_'.length)).then(res=>{setJoined({workspace_name:res.workspace_name,role:res.role});return load()}).catch(e=>{setError(e instanceof Error?e.message:'Ошибка принятия приглашения');return load()})}else{load()}},[])
@@ -194,9 +198,9 @@ export default function App(){
    </div>)}
   </section>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&!showBookingForm&&!showAdvForm&&tab==='overview'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='overview'&&<>
    {!active&&!loading?<section className="hero"><p>Создайте рабочее пространство агентства.</p><input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',marginBottom:12}}/><button onClick={create}><CirclePlus size={19}/> Создать</button></section>:<>
-    <section className="hero"><span className="eyebrow">{active?.role}</span><p style={{marginTop:8}}>{active?.name}</p><div>{spaces.length>1&&<select value={active?.id} onChange={e=>{buzz();setActive(spaces.find(x=>x.id===Number(e.target.value))||null)}}>{spaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select>}</div></section>
+    <section className="hero"><span className="eyebrow">{active?.role}</span><p style={{marginTop:8}}>{active?.name}</p><div>{spaces.length>1&&<select value={active?.id} onChange={e=>{buzz();setActiveId(Number(e.target.value))}}>{spaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select>}</div></section>
     {pending.length>0&&<section className="panel" style={{marginTop:16}}><div className="panel-title"><h2>Обнаруженные каналы</h2><Radio size={20}/></div>{pending.map(p=><article key={p.id} style={{padding:'14px 0',borderBottom:'1px solid var(--border)'}}><strong>{p.title}</strong><p style={{color:'var(--muted)',fontSize:12}}>{p.bot_permissions.can_post_messages?'Публикация разрешена':'Нет права публикации'}</p><button onClick={()=>connect(p.id)} disabled={!p.bot_permissions.can_post_messages}>Подключить</button></article>)}</section>}
     <section className="stats"><article><span>Каналы</span><strong>{channels.length}</strong></article><article><span>Запланировано</span><strong>{posts.filter(p=>p.status==='scheduled').length}</strong></article><article><span>На согласовании</span><strong>{posts.filter(p=>p.status==='review').length}</strong></article><article><span>Доход за месяц</span><strong>{finSummary?finSummary.income.toLocaleString('ru-RU'):'0'} ₽</strong></article></section>
     <section id="channels-section" className="panel"><div className="panel-title"><h2>Каналы</h2><CalendarDays size={20}/></div>{channels.length?channels.map(c=><div key={c.id} style={{padding:'15px 0',borderBottom:'1px solid var(--border)'}}><strong>{c.title}</strong><div style={{color:'var(--accent-2)',fontSize:12}}>● подключён</div></div>):<div className="empty"><div className="empty-icon"><Megaphone/></div><h3>Каналов пока нет</h3><p>Добавьте бота администратором канала и обновите экран.</p></div>}</section>
@@ -215,7 +219,7 @@ export default function App(){
    </>}
   </>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&!showBookingForm&&!showAdvForm&&tab==='calendar'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='calendar'&&<>
    {!active?<section className="panel"><div className="empty"><div className="empty-icon"><CalendarDays/></div><h3>Создайте рабочее пространство</h3><p>Календарь публикаций появится после создания пространства и подключения канала.</p></div></section>:<>
     <section className="panel">
      <div className="cal-head">
@@ -240,7 +244,7 @@ export default function App(){
    </>}
   </>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&!showBookingForm&&!showAdvForm&&tab==='ads'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='ads'&&<>
    {!active?<section className="panel"><div className="empty"><div className="empty-icon"><Megaphone/></div><h3>Создайте рабочее пространство</h3><p>Раздел клиентов появится после создания пространства.</p></div></section>:<>
     <section className="panel"><div className="panel-title"><h2>Клиенты</h2><Users size={20}/></div>
      <p style={{color:'var(--muted)',fontSize:12,margin:'4px 0 0'}}>Рекламодатели и размещения. Создание — через «+» внизу.</p>
@@ -307,7 +311,26 @@ export default function App(){
    </>}
   </section>}
 
-    {showBookingForm&&<section className="panel">
+      {showSettings&&<section className="panel">
+   <div className="panel-title"><h2>Настройки</h2><Settings size={20}/></div>
+   <button className="icon-btn" onClick={()=>{buzz();setShowSettings(false)}} style={{marginBottom:10}}>← Назад</button>
+   {active?<>
+    <div style={{fontSize:13,color:'var(--muted)'}}>Рабочее пространство</div>
+    <p style={{margin:'8px 0 0',fontSize:16,fontWeight:700}}>{active.name}</p>
+    <div style={{fontSize:12,color:'var(--muted-2)',marginTop:4}}>Ваша роль: {ROLE_LABEL[active.role]||active.role}</div>
+    {active.role==='owner'&&<div style={{marginTop:24}}>
+     <div style={{fontSize:13,color:'var(--danger)',fontWeight:600}}>Опасная зона</div>
+     <p style={{fontSize:12,color:'var(--muted-2)',margin:'6px 0 10px'}}>Удаление скроет агентство и все его данные (каналы, посты, рекламу, финансы). Действие нельзя отменить в интерфейсе.</p>
+     {!confirmDelete?<button className="icon-btn danger" onClick={()=>{buzz();setConfirmDelete(true)}}>Удалить агентство</button>
+      :<div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        <button style={{border:'1px solid var(--danger-border)',background:'var(--danger-bg)',color:'var(--danger)',borderRadius:10,padding:'10px 14px',fontWeight:700}} onClick={()=>doDeleteWorkspace()}>Точно удалить</button>
+        <button className="icon-btn" onClick={()=>{buzz();setConfirmDelete(false)}}>Отмена</button>
+       </div>}
+    </div>}
+   </>:<p style={{color:'var(--muted)'}}>Создайте агентство, чтобы настроить пространство.</p>}
+  </section>}
+
+{showBookingForm&&<section className="panel">
    <div className="panel-title"><h2>Новая бронь</h2><Megaphone size={20}/></div>
    <button className="icon-btn" onClick={()=>{buzz();setShowBookingForm(false)}} style={{marginBottom:10}}>← Назад</button>
    <label className="form-label">Рекламодатель</label>
@@ -416,14 +439,14 @@ export default function App(){
   </section>}
 
 
-  {!showMediaKits&&!showTasks&&!showCompose&&!showBookingForm&&!showAdvForm&&tab==='more'&&<section className="panel"><div className="panel-title"><h2>Ещё</h2><MoreHorizontal size={20}/></div>
+  {!showMediaKits&&!showTasks&&!showCompose&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='more'&&<section className="panel"><div className="panel-title"><h2>Ещё</h2><MoreHorizontal size={20}/></div>
    {[
     {icon:Megaphone,label:'Каналы',desc:'Управление подключёнными каналами',action:()=>goSection('channels-section')},
     {icon:Users,label:'Команда',desc:'Участники и приглашения',action:()=>goSection('team-section')},
     {icon:CheckCircle2,label:'Задачи',desc:'Задачи и напоминания',action:()=>{buzz();setShowTasks(true)}},
     {icon:LineChart,label:'Аналитика',desc:'Скоро — доходы, расходы и отчёты'},
     {icon:ImageIcon,label:'Медиакиты',desc:'Презентация для рекламодателей',action:()=>{buzz();setShowMediaKits(true)}},
-    {icon:Settings,label:'Настройки',desc:'Пространство и уведомления'},
+    {icon:Settings,label:'Настройки',desc:'Пространство и уведомления',action:()=>{buzz();setShowSettings(true)}},
    ].map(item=>{
     const I=item.icon
     const go=()=>{if(item.action){item.action()}else{buzz()}}

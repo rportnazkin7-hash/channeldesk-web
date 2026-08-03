@@ -44,6 +44,7 @@ async function uploadDirect(ticket:UploadTicket,file:File):Promise<void>{
 export const api={
  workspaces:()=>req<Workspace[]>('/api/workspaces'),
  createWorkspace:(name:string)=>req<Workspace>('/api/workspaces',{method:'POST',body:JSON.stringify({name})}),
+ deleteWorkspace:(id:number)=>req<void>(`/api/workspaces/${id}`,{method:'DELETE'}),
  pending:()=>req<Pending[]>('/api/channel-connections/pending'),
  channels:(wid:number)=>req<Channel[]>(`/api/workspaces/${wid}/channels`),
  connect:(wid:number,id:number)=>req<Channel>(`/api/workspaces/${wid}/channels/connect`,{method:'POST',body:JSON.stringify({connection_id:id})}),
@@ -74,7 +75,7 @@ export const api={
  createAdvertiser:(wid:number,p:{name:string;contact?:Record<string,string>;notes?:string})=>req<Advertiser>(`/api/workspaces/${wid}/advertisers`,{method:'POST',body:JSON.stringify(p)}),
  deleteAdvertiser:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/advertisers/${id}`,{method:'DELETE'}),
  bookings:(wid:number,status?:string)=>req<Booking[]>(`/api/workspaces/${wid}/bookings${status?`?status=${status}`:''}`),
- createBooking:(wid:number,p:{advertiser_id:number;channel_id?:number|null;format?:string;cost:number;currency?:string;publish_at?:string|null;erid?:string|null;erid_required?:boolean;materials_url?:string|null})=>req<Booking>(`/api/workspaces/${wid}/bookings`,{method:'POST',body:JSON.stringify(p)}),
+ createBooking:(wid:number,p:{advertiser_id:number;channel_id?:number|null;format?:string;cost:number;currency?:string;publish_at?:string|null;delete_at?:string|null;erid?:string|null;erid_required?:boolean;materials_url?:string|null})=>req<Booking>(`/api/workspaces/${wid}/bookings`,{method:'POST',body:JSON.stringify(p)}),
  updateBooking:(wid:number,id:number,p:Record<string,unknown>)=>req<Booking>(`/api/workspaces/${wid}/bookings/${id}`,{method:'PATCH',body:JSON.stringify(p)}),
  payBooking:(wid:number,id:number,payment_status:string)=>req<Booking>(`/api/workspaces/${wid}/bookings/${id}/pay`,{method:'POST',body:JSON.stringify({payment_status})}),
  deleteBooking:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/bookings/${id}`,{method:'DELETE'}),
