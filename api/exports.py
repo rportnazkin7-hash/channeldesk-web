@@ -134,8 +134,15 @@ def posts_pdf(posts: list[dict]) -> StreamingResponse:
 
 # --- Маршруты экспорта ---
 
-@router.post('/workspaces/{workspace_id}/exports', status_code=201)
-def create_export_job(workspace_id: int, payload: ExportRequest, user: dict = Depends(current_user)):
+@router.get('/workspaces/{workspace_id}/exports')
+def list_exports(workspace_id: int, user: dict = Depends(current_user)):
+    """Статусы последних заданий экспорта (для диагностики)."""
+    member = membership(user['id'], workspace_id)
+    require_action(member, 'post.view')
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute("""SELECT id,kind,format,status,error_text,created_at,completed_at
+        FROM cd_exports WHERE workspace_id=%s ORDER BY created_at DESC LIMIT 10""", (workspace_id,))
+        return cur.fetchall()
     """Создаёт задание на экспорт: файл сгенерирует и отправит бот прямо в Telegram."""
     member = membership(user['id'], workspace_id)
     action = {'posts': 'post.view', 'bookings': 'booking.view', 'finance': 'finance.view'}.get(payload.kind)
