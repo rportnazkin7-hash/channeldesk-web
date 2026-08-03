@@ -44,6 +44,7 @@ declare global {
         expand?: () => void
         setHeaderColor?: (c: string) => void
         setBackgroundColor?: (c: string) => void
+        HapticFeedback?: { impactOccurred?: (style: string) => void }
       }
     }
   }
