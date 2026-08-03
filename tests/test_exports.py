@@ -87,6 +87,15 @@ def test_export_finance_xlsx(monkeypatch):
     assert wb.active['B1'].value == 'Тип'
 
 
+def test_export_finance_pdf(monkeypatch):
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, [TX_ROW]])
+    monkeypatch.setattr('api.exports.connect', lambda: conn)
+    r = client.get('/api/workspaces/3/export/finance?format=pdf', headers=auth_headers())
+    assert r.status_code == 200
+    assert 'application/pdf' in r.headers['content-type']
+    assert r.content[:4] == b'%PDF'
+
+
 def test_export_finance_csv(monkeypatch):
     conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, [TX_ROW]])
     monkeypatch.setattr('api.exports.connect', lambda: conn)
@@ -108,6 +117,18 @@ def test_create_export_job(monkeypatch):
     calls = [call for cur in conn.cursors for call in cur.calls]
     insert = next(sql for sql, _ in calls if 'INSERT INTO cd_exports' in sql)
     assert 'telegram_id' in insert
+
+
+def test_create_finance_export_job_for_period(monkeypatch):
+    job = {'id': 2, 'kind': 'finance', 'format': 'xlsx', 'status': 'pending'}
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, job])
+    monkeypatch.setattr('api.exports.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/exports',
+                    json={'kind': 'finance', 'format': 'xlsx', 'period_year': 2026, 'period_month': 8},
+                    headers=auth_headers())
+    assert r.status_code == 201
+    insert = next(params for cur in conn.cursors for sql, params in cur.calls if 'INSERT INTO cd_exports' in sql)
+    assert insert[-2:] == (2026, 8)
 
 
 def test_create_export_job_bad_kind(monkeypatch):

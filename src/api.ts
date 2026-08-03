@@ -25,8 +25,9 @@ export type Template={id:number;name:string;title:string;text:string}
 export type Asset={id:number;file_name:string;file_type:string;file_url:string;size_bytes:number|null}
 export type Advertiser={id:number;name:string;contact:Record<string,string>|null;notes:string;is_active:boolean}
 export type Booking={id:number;advertiser_id:number;channel_id:number|null;post_id:number|null;format:string;cost:number;currency:string;status:string;payment_status:string;publish_at:string|null;delete_at:string|null;erid:string|null;erid_required:boolean;materials_url:string|null;report_url:string|null;advertiser_name:string|null;channel_title:string|null}
-export type FinanceTx={id:number;booking_id:number|null;type:'income'|'expense';amount:number;currency:string;category:string;description:string;occurred_at:string}
-export type FinanceSummary={year:number;month:number;income:number;expense:number;profit:number;count:number}
+export type FinanceTx={id:number;booking_id:number|null;type:'income'|'expense';amount:number;currency:string;category:string;description:string;occurred_at:string;advertiser_name?:string|null;channel_title?:string|null}
+export type FinanceTrend={year:number;month:number;income:number;expense:number;profit:number}
+export type FinanceSummary={year:number;month:number;income:number;expense:number;profit:number;count:number;trend:FinanceTrend[]}
 export type MediaKit={id:number;name:string;channel_id:number|null;channel_title:string|null;description:string;audience:Record<string,unknown>;stats:Record<string,unknown>;pricing:unknown[];contacts:Record<string,unknown>;is_active:boolean}
 export type Task={id:number;title:string;description:string;status:'todo'|'in_progress'|'done'|'cancelled';priority:'low'|'normal'|'high'|'urgent';assignee_id:number|null;due_at:string|null;remind_at:string|null;assignee_username:string|null;assignee_first_name:string|null}
 export type UploadTicket={asset_id:number;file_url:string;upload_url:string;anon_key:string;bucket:string}
@@ -79,8 +80,9 @@ export const api={
  updateBooking:(wid:number,id:number,p:Record<string,unknown>)=>req<Booking>(`/api/workspaces/${wid}/bookings/${id}`,{method:'PATCH',body:JSON.stringify(p)}),
  payBooking:(wid:number,id:number,payment_status:string)=>req<Booking>(`/api/workspaces/${wid}/bookings/${id}/pay`,{method:'POST',body:JSON.stringify({payment_status})}),
  deleteBooking:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/bookings/${id}`,{method:'DELETE'}),
- financeSummary:(wid:number,year:number,month:number)=>req<FinanceSummary>(`/api/workspaces/${wid}/finance/summary?year=${year}&month=${month}`),
- createTransaction:(wid:number,p:{type:'income'|'expense';amount:number;category?:string;description?:string})=>req<FinanceTx>(`/api/workspaces/${wid}/finance/transactions`,{method:'POST',body:JSON.stringify(p)}),
+  financeSummary:(wid:number,year:number,month:number)=>req<FinanceSummary>(`/api/workspaces/${wid}/finance/summary?year=${year}&month=${month}`),
+  financeTransactions:(wid:number,year:number,month:number,limit=100)=>req<FinanceTx[]>(`/api/workspaces/${wid}/finance/transactions?year=${year}&month=${month}&limit=${limit}`),
+  createTransaction:(wid:number,p:{type:'income'|'expense';amount:number;category?:string;description?:string;occurred_at?:string})=>req<FinanceTx>(`/api/workspaces/${wid}/finance/transactions`,{method:'POST',body:JSON.stringify(p)}),
  mediaKits:(wid:number)=>req<MediaKit[]>(`/api/workspaces/${wid}/media-kits`),
  createMediaKit:(wid:number,p:{name:string;channel_id?:number|null;description?:string;stats?:Record<string,unknown>;pricing?:unknown[];contacts?:Record<string,unknown>})=>req<MediaKit>(`/api/workspaces/${wid}/media-kits`,{method:'POST',body:JSON.stringify(p)}),
  updateMediaKit:(wid:number,id:number,p:Record<string,unknown>)=>req<MediaKit>(`/api/workspaces/${wid}/media-kits/${id}`,{method:'PATCH',body:JSON.stringify(p)}),
@@ -89,6 +91,6 @@ export const api={
  createTask:(wid:number,p:{title:string;description?:string;priority?:string;assignee_id?:number|null;due_at?:string|null;remind_at?:string|null})=>req<Task>(`/api/workspaces/${wid}/tasks`,{method:'POST',body:JSON.stringify(p)}),
  completeTask:(wid:number,id:number)=>req<Task>(`/api/workspaces/${wid}/tasks/${id}/done`,{method:'POST'}),
  deleteTask:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/tasks/${id}`,{method:'DELETE'}),
- requestExport:(wid:number,kind:'posts'|'bookings'|'finance',format:'csv'|'xlsx'|'pdf')=>req<{id:number;kind:string;format:string;status:string;message:string}>(`/api/workspaces/${wid}/exports`,{method:'POST',body:JSON.stringify({kind,format})}),
+  requestExport:(wid:number,kind:'posts'|'bookings'|'finance',format:'csv'|'xlsx'|'pdf',period?:{year:number;month:number})=>req<{id:number;kind:string;format:string;status:string;message:string}>(`/api/workspaces/${wid}/exports`,{method:'POST',body:JSON.stringify({kind,format,...(period?{period_year:period.year,period_month:period.month}:{})})}),
  exportsStatus:(wid:number)=>req<{id:number;kind:string;format:string;status:string;error_text:string|null;created_at:string;completed_at:string|null}[]>(`/api/workspaces/${wid}/exports`),
 }

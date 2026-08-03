@@ -1,6 +1,7 @@
 from __future__ import annotations
 import json
-from datetime import datetime
+from datetime import datetime, timezone
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from api.auth import current_user
@@ -33,8 +34,8 @@ class BookingCreate(BaseModel):
     channel_id: int | None = None
     post_id: int | None = None
     format: str = 'post'
-    cost: float = Field(default=0, ge=0)
-    currency: str = 'RUB'
+    cost: Decimal = Field(default=Decimal('0'), ge=0)
+    currency: str = Field(default='RUB', min_length=1, max_length=8)
     status: str = 'requested'
     payment_status: str = 'unpaid'
     publish_at: datetime | None = None
@@ -50,8 +51,8 @@ class BookingUpdate(BaseModel):
     channel_id: int | None = None
     post_id: int | None = None
     format: str | None = None
-    cost: float | None = Field(default=None, ge=0)
-    currency: str | None = None
+    cost: Decimal | None = Field(default=None, ge=0)
+    currency: str | None = Field(default=None, min_length=1, max_length=8)
     status: str | None = None
     payment_status: str | None = None
     publish_at: datetime | None = None
@@ -65,10 +66,10 @@ class BookingUpdate(BaseModel):
 
 class TransactionCreate(BaseModel):
     type: str
-    amount: float = Field(ge=0)
-    currency: str = 'RUB'
-    category: str = 'other'
-    description: str = ''
+    amount: Decimal = Field(ge=0)
+    currency: str = Field(default='RUB', min_length=1, max_length=8)
+    category: str = Field(default='other', min_length=1, max_length=32)
+    description: str = Field(default='', max_length=5000)
     booking_id: int | None = None
     occurred_at: datetime | None = None
 
@@ -301,14 +302,57 @@ def mark_paid(workspace_id: int, booking_id: int, payload: BookingUpdate, user: 
 
 # --- Финансы ---
 
+
+def _finance_period(year: int | None, month: int | None) -> tuple[int, int]:
+    """Возвращает корректный период в UTC и не отдаёт плохие даты в make_date()."""
+    now = datetime.now(timezone.utc)
+    current_year, current_month = now.year, now.month
+    y = year if year is not None else current_year
+    m = month if month is not None else current_month
+    if not 2000 <= y <= 2100:
+        raise HTTPException(422, 'Год должен быть от 2000 до 2100')
+    if not 1 <= m <= 12:
+        raise HTTPException(422, 'Месяц должен быть от 1 до 12')
+    return y, m
+
+
+def _shift_month(year: int, month: int, offset: int) -> tuple[int, int]:
+    total = year * 12 + month - 1 + offset
+    return total // 12, total % 12 + 1
+
+
+def _as_decimal(value) -> Decimal:
+    return value if isinstance(value, Decimal) else Decimal(str(value or 0))
+
+
 @router.get('/workspaces/{workspace_id}/finance/transactions')
-def list_transactions(workspace_id: int, limit: int = 100, user: dict = Depends(current_user)):
+def list_transactions(workspace_id: int, year: int | None = None, month: int | None = None,
+                      transaction_type: str | None = None, limit: int = 100,
+                      user: dict = Depends(current_user)):
     member = membership(user['id'], workspace_id)
     require_action(member, 'finance.view')
     limit = max(1, min(limit, 300))
+    params: list = [workspace_id]
+    sql = """SELECT t.*, a.name AS advertiser_name, c.title AS channel_title
+             FROM cd_finance_transactions t
+             LEFT JOIN cd_ad_bookings b ON b.id=t.booking_id
+             LEFT JOIN cd_advertisers a ON a.id=b.advertiser_id
+             LEFT JOIN cd_channels c ON c.id=b.channel_id
+             WHERE t.workspace_id=%s"""
+    if year is not None or month is not None:
+        y, m = _finance_period(year, month)
+        sql += " AND t.occurred_at >= make_date(%s,%s,1)"
+        sql += " AND t.occurred_at < make_date(%s,%s,1) + interval '1 month'"
+        params.extend([y, m, y, m])
+    if transaction_type:
+        if transaction_type not in ('income', 'expense'):
+            raise HTTPException(422, 'Тип транзакции: income или expense')
+        sql += ' AND t.type=%s'
+        params.append(transaction_type)
+    sql += ' ORDER BY t.occurred_at DESC, t.id DESC LIMIT %s'
+    params.append(limit)
     with connect() as conn, conn.cursor() as cur:
-        cur.execute("""SELECT * FROM cd_finance_transactions WHERE workspace_id=%s
-        ORDER BY occurred_at DESC, id DESC LIMIT %s""", (workspace_id, limit))
+        cur.execute(sql, params)
         return cur.fetchall()
 
 
@@ -318,6 +362,9 @@ def create_transaction(workspace_id: int, payload: TransactionCreate, user: dict
     require_action(member, 'finance.manage')
     if payload.type not in ('income', 'expense'):
         raise HTTPException(422, 'Тип транзакции: income или expense')
+    amount = payload.amount.quantize(Decimal('0.01'))
+    currency = payload.currency.strip().upper()
+    category = payload.category.strip().lower()
     with connect() as conn, conn.cursor() as cur:
         if payload.booking_id is not None:
             cur.execute('SELECT id FROM cd_ad_bookings WHERE id=%s AND workspace_id=%s',
@@ -327,8 +374,8 @@ def create_transaction(workspace_id: int, payload: TransactionCreate, user: dict
         cur.execute("""INSERT INTO cd_finance_transactions(workspace_id,booking_id,type,amount,currency,
         category,description,occurred_at,created_by)
         VALUES(%s,%s,%s,%s,%s,%s,%s,COALESCE(%s,now()),%s) RETURNING *""",
-                    (workspace_id, payload.booking_id, payload.type, payload.amount, payload.currency,
-                     payload.category, payload.description, payload.occurred_at, user['id']))
+                    (workspace_id, payload.booking_id, payload.type, amount, currency,
+                     category, payload.description.strip(), payload.occurred_at, user['id']))
         row = cur.fetchone()
         audit(cur, workspace_id, user['id'], 'finance.created', 'transaction', row['id'])
         return row
@@ -339,17 +386,38 @@ def finance_summary(workspace_id: int, year: int | None = None, month: int | Non
                     user: dict = Depends(current_user)):
     member = membership(user['id'], workspace_id)
     require_action(member, 'finance.view')
-    now = datetime.utcnow()
-    y = year or now.year
-    m = month or now.month
+    y, m = _finance_period(year, month)
+    start_y, start_m = _shift_month(y, m, -5)
     with connect() as conn, conn.cursor() as cur:
         cur.execute("""SELECT type, COALESCE(SUM(amount),0) AS total, COUNT(*) AS cnt
         FROM cd_finance_transactions
-        WHERE workspace_id=%s AND date_trunc('month', occurred_at)=date_trunc('month', make_date(%s,%s,1))
-        GROUP BY type""", (workspace_id, y, m))
+        WHERE workspace_id=%s
+          AND occurred_at >= make_date(%s,%s,1)
+          AND occurred_at < make_date(%s,%s,1) + interval '1 month'
+        GROUP BY type""", (workspace_id, y, m, y, m))
         rows = cur.fetchall()
-    income = next((r['total'] for r in rows if r['type'] == 'income'), 0)
-    expense = next((r['total'] for r in rows if r['type'] == 'expense'), 0)
+        cur.execute("""SELECT EXTRACT(YEAR FROM occurred_at)::int AS year,
+        EXTRACT(MONTH FROM occurred_at)::int AS month,
+        COALESCE(SUM(amount) FILTER (WHERE type='income'),0) AS income,
+        COALESCE(SUM(amount) FILTER (WHERE type='expense'),0) AS expense
+        FROM cd_finance_transactions
+        WHERE workspace_id=%s
+          AND occurred_at >= make_date(%s,%s,1)
+          AND occurred_at < make_date(%s,%s,1) + interval '1 month'
+        GROUP BY 1,2 ORDER BY 1,2""", (workspace_id, start_y, start_m, y, m))
+        trend_rows = cur.fetchall()
+    income = next((_as_decimal(r.get('total')) for r in rows if r['type'] == 'income'), Decimal('0'))
+    expense = next((_as_decimal(r.get('total')) for r in rows if r['type'] == 'expense'), Decimal('0'))
+    trend_map = {(int(r['year']), int(r['month'])): r for r in trend_rows}
+    trend = []
+    for offset in range(6):
+        trend_y, trend_m = _shift_month(start_y, start_m, offset)
+        point = trend_map.get((trend_y, trend_m), {})
+        trend_income = _as_decimal(point.get('income'))
+        trend_expense = _as_decimal(point.get('expense'))
+        trend.append({'year': trend_y, 'month': trend_m,
+                      'income': float(trend_income), 'expense': float(trend_expense),
+                      'profit': float(trend_income - trend_expense)})
     return {'year': y, 'month': m,
             'income': float(income), 'expense': float(expense), 'profit': float(income - expense),
-            'count': sum(r['cnt'] for r in rows)}
+            'count': sum(int(r.get('cnt') or 0) for r in rows), 'trend': trend}

@@ -21,6 +21,8 @@ EXPORT_FORMATS = {'csv', 'xlsx', 'pdf'}
 class ExportRequest(BaseModel):
     kind: str
     format: str = 'csv'
+    period_year: int | None = None
+    period_month: int | None = None
 
 
 def _fmt(dt) -> str:
@@ -103,6 +105,36 @@ def finance_xlsx(transactions: list[dict]) -> StreamingResponse:
                              headers={'Content-Disposition': 'attachment; filename="finance.xlsx"'})
 
 
+def finance_pdf(transactions: list[dict]) -> StreamingResponse:
+    from fpdf import FPDF
+    fonts = Path(__file__).resolve().parents[1] / 'assets' / 'fonts'
+    pdf = FPDF(orientation='L')
+    pdf.add_font('DejaVu', '', str(fonts / 'DejaVuSans.ttf'))
+    pdf.add_font('DejaVu', 'B', str(fonts / 'DejaVuSans-Bold.ttf'))
+    pdf.add_page()
+    pdf.set_font('DejaVu', 'B', 14)
+    pdf.cell(0, 10, 'ChannelDesk - Финансы', new_x='LMARGIN', new_y='NEXT')
+    headers = ['ID', 'Тип', 'Сумма', 'Валюта', 'Категория', 'Описание', 'Дата']
+    widths = [12, 24, 30, 18, 34, 116, 38]
+    pdf.set_font('DejaVu', 'B', 8)
+    for header, width in zip(headers, widths):
+        pdf.cell(width, 7, header, border=1)
+    pdf.ln()
+    pdf.set_font('DejaVu', '', 8)
+    for t in transactions:
+        values = [t.get('id'), 'Доход' if t.get('type') == 'income' else 'Расход', t.get('amount'),
+                  t.get('currency') or '', t.get('category') or '', t.get('description') or '',
+                  _fmt(t.get('occurred_at'))]
+        for value, width in zip(values, widths):
+            pdf.cell(width, 7, '' if value is None else str(value)[:70], border=1)
+        pdf.ln()
+    buffer = io.BytesIO()
+    pdf.output(buffer)
+    buffer.seek(0)
+    return StreamingResponse(buffer, media_type='application/pdf',
+                             headers={'Content-Disposition': 'attachment; filename="finance.pdf"'})
+
+
 def posts_pdf(posts: list[dict]) -> StreamingResponse:
     from fpdf import FPDF
     fonts = Path(__file__).resolve().parents[1] / 'assets' / 'fonts'
@@ -155,12 +187,20 @@ def create_export_job(workspace_id: int, payload: ExportRequest, user: dict = De
     require_action(member, action)
     if payload.format not in EXPORT_FORMATS:
         raise HTTPException(422, 'Неизвестный формат')
+    if payload.period_year is not None or payload.period_month is not None:
+        if payload.kind != 'finance' or payload.period_year is None or payload.period_month is None:
+            raise HTTPException(422, 'Период можно указать только для финансового экспорта')
+        if not 2000 <= payload.period_year <= 2100:
+            raise HTTPException(422, 'Год должен быть от 2000 до 2100')
+        if not 1 <= payload.period_month <= 12:
+            raise HTTPException(422, 'Месяц должен быть от 1 до 12')
     if payload.kind == 'posts' and payload.format == 'pdf':
         pass  # PDF доступен для постов
     with connect() as conn, conn.cursor() as cur:
-        cur.execute("""INSERT INTO cd_exports(workspace_id,user_id,telegram_id,kind,format)
-        VALUES(%s,%s,%s,%s,%s) RETURNING id,kind,format,status""",
-                    (workspace_id, user['id'], user['telegram_id'], payload.kind, payload.format))
+        cur.execute("""INSERT INTO cd_exports(workspace_id,user_id,telegram_id,kind,format,period_year,period_month)
+        VALUES(%s,%s,%s,%s,%s,%s,%s) RETURNING id,kind,format,status""",
+                    (workspace_id, user['id'], user['telegram_id'], payload.kind, payload.format,
+                     payload.period_year, payload.period_month))
         row = cur.fetchone()
     return {**row, 'message': 'Файл будет отправлен ботом в Telegram в течение ~30 секунд'}
 
@@ -215,6 +255,8 @@ def export_finance(workspace_id: int, format: str = 'csv', user: dict = Depends(
     transactions = _load_transactions(workspace_id)
     if format == 'xlsx':
         return finance_xlsx(transactions)
+    if format == 'pdf':
+        return finance_pdf(transactions)
     return finance_csv(transactions)
 
 

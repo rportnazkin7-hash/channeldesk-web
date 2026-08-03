@@ -136,6 +136,38 @@ def test_finance_summary(monkeypatch):
     assert body['profit'] == 3800
 
 
+def test_list_transactions_by_period(monkeypatch):
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, [TX_ROW]])
+    monkeypatch.setattr('api.ads.connect', lambda: conn)
+    r = client.get('/api/workspaces/3/finance/transactions?year=2026&month=8&limit=20', headers=auth_headers())
+    assert r.status_code == 200
+    assert r.json()[0]['amount'] == 1000
+    sql = ' '.join(call[0] for cur in conn.cursors for call in cur.calls)
+    assert 'make_date' in sql
+    assert 'ORDER BY t.occurred_at' in sql
+
+
+def test_finance_rejects_invalid_month(monkeypatch):
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN])
+    monkeypatch.setattr('api.ads.connect', lambda: conn)
+    r = client.get('/api/workspaces/3/finance/transactions?year=2026&month=13', headers=auth_headers())
+    assert r.status_code == 422
+    assert 'Месяц' in r.json()['detail']
+
+
+def test_finance_summary_has_six_month_trend(monkeypatch):
+    summary_rows = [{'type': 'income', 'total': 5000, 'cnt': 1}]
+    trend_rows = [{'year': 2026, 'month': 8, 'income': 5000, 'expense': 0}]
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, summary_rows, trend_rows])
+    monkeypatch.setattr('api.ads.connect', lambda: conn)
+    r = client.get('/api/workspaces/3/finance/summary?year=2026&month=8', headers=auth_headers())
+    assert r.status_code == 200
+    trend = r.json()['trend']
+    assert len(trend) == 6
+    assert trend[-1]['month'] == 8
+    assert trend[-1]['income'] == 5000
+
+
 def test_create_expense(monkeypatch):
     conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, TX_ROW])
     monkeypatch.setattr('api.ads.connect', lambda: conn)
