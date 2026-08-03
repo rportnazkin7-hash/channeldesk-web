@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS cd_exports (
   telegram_id bigint NOT NULL,
   kind varchar(16) NOT NULL CHECK (kind IN ('posts','bookings','finance')),
   format varchar(8) NOT NULL CHECK (format IN ('csv','xlsx','pdf')),
-  status varchar(16) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','done','failed')),
+  status varchar(16) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','processing','done','failed')),
   error_text text,
   created_at timestamptz NOT NULL DEFAULT now(),
   completed_at timestamptz
