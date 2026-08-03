@@ -56,7 +56,9 @@ def health_storage():
     if not anon:
         missing.append('SUPABASE_ANON_KEY')
     host = url.split('//')[-1] if url and '//' in url else (url or '')
+    looks_like_key = bool(url) and ('_' in host or host.startswith('ey') or not url.startswith('https://'))
     return {'configured': not missing, 'missing': missing, 'host': host,
+            'looks_like_key': looks_like_key,
             'mode': 'direct-browser-upload',
             'hint': 'Для прямой загрузки из браузера Supabase Storage должен разрешать CORS: '
                     'Supabase → Project Settings → API → Allowed Origins → добавить https://channeldesk.vercel.app (или *)'}

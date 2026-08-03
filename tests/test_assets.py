@@ -65,6 +65,18 @@ def test_create_upload_url_no_supabase_url(monkeypatch):
     assert 'SUPABASE_URL' in r.json()['detail']
 
 
+def test_create_upload_url_key_instead_of_url(monkeypatch):
+    """SUPABASE_URL содержит publishable-ключ (sb_publishable_...) вместо URL — ловим 503."""
+    monkeypatch.setenv('SUPABASE_URL', 'https://sb_publishable_AbCdEf.supabase.co')
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_EDITOR, {'id': 10}, ASSET_ROW])
+    monkeypatch.setattr('api.assets.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/assets/upload-url',
+                    json={'post_id': 10, 'file_name': 'a.txt', 'content_type': 'text/plain', 'size': 5},
+                    headers=auth_headers())
+    assert r.status_code == 503
+    assert 'ключ' in r.json()['detail'].lower()
+
+
 def test_create_upload_url_oversize(monkeypatch):
     conn = patch_db(monkeypatch, [USER_ROW, MEMBER_EDITOR])
     monkeypatch.setattr('api.assets.connect', lambda: conn)

@@ -32,6 +32,13 @@ def storage_base_url() -> str:
     url = os.getenv('SUPABASE_URL', '').strip().rstrip('/')
     if not url:
         raise HTTPException(503, 'SUPABASE_URL не задан на Vercel (Settings → Environment Variables)')
+    host = url.split('//')[-1] if '//' in url else url
+    # Ключи Supabase (anon/publishable/service_role) имеют вид sb_publishable_.../eyJ...
+    # и НЕ являются URL проекта. Настоящий URL: https://<project-ref>.supabase.co
+    if not url.startswith('https://') or '_' in host or host.startswith('ey'):
+        raise HTTPException(503, 'SUPABASE_URL похож на ключ, а не на URL проекта. '
+                                 'Вставьте Project URL вида https://<project-ref>.supabase.co '
+                                 '(Supabase → Project Settings → API → Project URL)')
     return url
 
 
