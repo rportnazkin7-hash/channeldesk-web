@@ -2,7 +2,7 @@ import { useCallback,useEffect,useState } from 'react'
 import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download } from 'lucide-react'
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit,type Task } from './api'
 
-const APP_VERSION = 'v0.18.0'
+const APP_VERSION = 'v0.18.1'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
@@ -216,13 +216,13 @@ export default function App(){
 
   {!showCompose&&!showTasks&&!showMediaKits&&tab==='ads'&&<>
    {!active?<section className="panel"><div className="empty"><div className="empty-icon"><Megaphone/></div><h3>Создайте рабочее пространство</h3><p>Рекламный раздел появится после создания пространства.</p></div></section>:<>
-    <section className="panel"><div className="panel-title"><h2>Реклама</h2><Megaphone size={20}/></div>
+    <section className="panel"><div className="panel-title"><h2>Клиенты</h2><Users size={20}/></div>
      <p style={{color:'var(--muted)',fontSize:12,margin:'4px 0 0'}}>Рекламодатели и активные размещения. Создание — через «+» внизу.</p>
     </section>
 
     <section className="panel" style={{marginTop:14}}>
-     <div className="panel-title"><h2>Рекламодатели</h2><Users size={20}/><button className="icon-btn" onClick={()=>{buzz();setFabOpen(true)}} title="Добавить"><Plus size={15}/></button></div>
-     {advertisers.length===0?<div className="empty"><p>Рекламодателей пока нет. Добавьте через «+».</p></div>:advertisers.map(a=><div key={a.id} style={{padding:'12px 0',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+     <div className="panel-title"><h2>Рекламодатели</h2><Users size={20}/></div>
+     {advertisers.length===0?<div className="empty"><p>Рекламодателей пока нет. Добавьте через кнопку «+» внизу.</p></div>:advertisers.map(a=><div key={a.id} style={{padding:'12px 0',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
       <div><strong style={{fontSize:14}}>{a.name}</strong>{a.notes&&<div style={{color:'var(--muted)',fontSize:12}}>{a.notes}</div>}</div>
       <div style={{display:'flex',gap:6,alignItems:'center'}}>
        <span className="no-erid-badge" style={{marginTop:0}}>{bookings.filter(b=>b.advertiser_id===a.id).length} броней</span>
@@ -232,8 +232,8 @@ export default function App(){
     </section>
 
     <section className="panel" style={{marginTop:14}}>
-     <div className="panel-title"><h2>Активные брони</h2><Wallet size={20}/><button className="icon-btn" onClick={()=>{buzz();setFabOpen(true)}} title="Добавить"><Plus size={15}/></button></div>
-     {bookings.filter(b=>!['done','cancelled'].includes(b.status)).length===0?<div className="empty"><p>Активных броней нет. Создайте через «+».</p></div>:bookings.filter(b=>!['done','cancelled'].includes(b.status)).map(b=><article key={b.id} style={{padding:'13px 0',borderBottom:'1px solid var(--border)'}}>
+     <div className="panel-title"><h2>Активные брони</h2><Wallet size={20}/></div>
+     {bookings.filter(b=>!['done','cancelled'].includes(b.status)).length===0?<div className="empty"><p>Активных броней нет. Создайте через кнопку «+» внизу.</p></div>:bookings.filter(b=>!['done','cancelled'].includes(b.status)).map(b=><article key={b.id} style={{padding:'13px 0',borderBottom:'1px solid var(--border)'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
        <strong style={{fontSize:14}}>{b.advertiser_name||`#${b.advertiser_id}`}</strong>
        <span className={"status status-"+b.status}>{BOOKING_STATUS_LABEL[b.status]||b.status}</span>
@@ -277,7 +277,7 @@ export default function App(){
   <button className={tab==='overview'?'active':''} onClick={()=>{buzz();setTab('overview')}}><BarChart3 size={21}/><span>Обзор</span></button>
   <button className={tab==='calendar'?'active':''} onClick={()=>{buzz();setTab('calendar')}}><CalendarDays size={21}/><span>Календарь</span></button>
   <button className="fab" onClick={()=>{buzz();setFabOpen(!fabOpen)}} title="Создать"><CirclePlus size={26}/><span>Создать</span></button>
-  <button className={tab==='ads'?'active':''} onClick={()=>{buzz();setTab('ads')}}><Megaphone size={21}/><span>Реклама</span></button>
+  <button className={tab==='ads'?'active':''} onClick={()=>{buzz();setTab('ads')}}><Megaphone size={21}/><span>Клиенты</span></button>
   <button className={tab==='more'?'active':''} onClick={()=>{buzz();setTab('more')}}><MoreHorizontal size={21}/><span>Ещё</span></button>
  </nav>
  {fabOpen&&<div className="fab-overlay" onClick={()=>setFabOpen(false)}>
