@@ -1,8 +1,8 @@
 import { useCallback,useEffect,useState } from 'react'
-import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2 } from 'lucide-react'
+import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download } from 'lucide-react'
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit,type Task } from './api'
 
-const APP_VERSION = 'v0.14.0'
+const APP_VERSION = 'v0.15.0'
 type Tab = 'overview'|'calendar'|'create'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
@@ -211,6 +211,11 @@ export default function App(){
     </section>
 
     <section className="panel" style={{marginTop:14}}><div className="panel-title"><h2>Публикации</h2><Clock size={20}/></div>
+     <div className="btn-row" style={{marginBottom:12}}>
+      <button className="icon-btn" onClick={()=>{buzz();active&&api.exportFile(active.id,'posts','csv').catch(e=>setError(e instanceof Error?e.message:'Ошибка экспорта'))}}><Download size={14}/> CSV</button>
+      <button className="icon-btn" onClick={()=>{buzz();active&&api.exportFile(active.id,'posts','xlsx').catch(e=>setError(e instanceof Error?e.message:'Ошибка экспорта'))}}><Download size={14}/> XLSX</button>
+      <button className="icon-btn" onClick={()=>{buzz();active&&api.exportFile(active.id,'posts','pdf').catch(e=>setError(e instanceof Error?e.message:'Ошибка экспорта'))}}><Download size={14}/> PDF</button>
+     </div>
      {dayPosts.length===0?<div className="empty"><p>Нет публикаций.</p></div>:dayPosts.map(renderPostCard)}
     </section>
    </>}
@@ -247,6 +252,10 @@ export default function App(){
       <div><span>Расход</span><strong style={{color:'#ff9b9b'}}>{finSummary.expense.toLocaleString('ru-RU')} ₽</strong></div>
       <div><span>Прибыль</span><strong style={{color:'#72d99f'}}>{finSummary.profit.toLocaleString('ru-RU')} ₽</strong></div>
      </div>}
+     <div className="btn-row" style={{marginTop:14}}>
+      <button className="icon-btn" onClick={()=>{buzz();active&&api.exportFile(active.id,adsTab==='finance'?'finance':adsTab==='advertisers'?'bookings':'bookings','csv').catch(e=>setError(e instanceof Error?e.message:'Ошибка экспорта'))}} title="Экспорт CSV"><Download size={15}/> CSV</button>
+      <button className="icon-btn" onClick={()=>{buzz();active&&api.exportFile(active.id,adsTab==='finance'?'finance':adsTab==='advertisers'?'bookings':'bookings','xlsx').catch(e=>setError(e instanceof Error?e.message:'Ошибка экспорта'))}} title="Экспорт XLSX"><Download size={15}/> XLSX</button>
+     </div>
     </section>
 
     {adsTab==='bookings'&&<section className="panel" style={{marginTop:14}}>

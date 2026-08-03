@@ -88,4 +88,10 @@ export const api={
  createTask:(wid:number,p:{title:string;description?:string;priority?:string;assignee_id?:number|null;due_at?:string|null;remind_at?:string|null})=>req<Task>(`/api/workspaces/${wid}/tasks`,{method:'POST',body:JSON.stringify(p)}),
  completeTask:(wid:number,id:number)=>req<Task>(`/api/workspaces/${wid}/tasks/${id}/done`,{method:'POST'}),
  deleteTask:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/tasks/${id}`,{method:'DELETE'}),
+ exportFile:async(wid:number,kind:'posts'|'bookings'|'finance',format:'csv'|'xlsx'|'pdf')=>{
+  const h=new Headers();const data=window.Telegram?.WebApp?.initData;if(data)h.set('X-Telegram-Init-Data',data)
+  const r=await fetch(`/api/workspaces/${wid}/export/${kind}?format=${format}`,{headers:h})
+  if(!r.ok){let m=`Ошибка ${r.status}`;try{const j=await r.json();m=j.detail||m}catch{}throw new Error(m)}
+  const blob=await r.blob();const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`${kind}.${format}`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000)
+ },
 }
