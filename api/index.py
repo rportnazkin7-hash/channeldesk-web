@@ -43,10 +43,10 @@ def health():
 
 @app.get('/api/health/storage')
 def health_storage():
-    """Диагностика хранилища (новая схема: прямая загрузка из браузера).
+    """Диагностика хранилища (прямая загрузка из браузера).
 
     Сетевого запроса из Vercel не делаем — egress к supabase.co недоступен (EBUSY).
-    Просто проверяем, настроены ли переменные, которые нужны фронту для прямой загрузки.
+    Возвращаем host проекта (публичная информация) и что настроено/не настроено.
     """
     url = os.getenv('SUPABASE_URL', '').strip()
     anon = os.getenv('SUPABASE_ANON_KEY', '').strip()
@@ -55,5 +55,8 @@ def health_storage():
         missing.append('SUPABASE_URL')
     if not anon:
         missing.append('SUPABASE_ANON_KEY')
-    return {'configured': not missing, 'missing': missing,
-            'mode': 'direct-browser-upload'}
+    host = url.split('//')[-1] if url and '//' in url else (url or '')
+    return {'configured': not missing, 'missing': missing, 'host': host,
+            'mode': 'direct-browser-upload',
+            'hint': 'Для прямой загрузки из браузера Supabase Storage должен разрешать CORS: '
+                    'Supabase → Project Settings → API → Allowed Origins → добавить https://channeldesk.vercel.app (или *)'}

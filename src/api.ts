@@ -31,7 +31,7 @@ async function uploadDirect(ticket:UploadTicket,file:File):Promise<void>{
   if(!r.ok){let m=`Ошибка ${r.status}`;try{const j=await r.json();m=j.message||j.error||m}catch{}throw new Error(`Загрузка файла в хранилище: ${m}`)}
  }catch(e){
   if(e instanceof DOMException&&e.name==='AbortError')throw new Error('Загрузка файла не завершилась за 90 секунд')
-  if(e instanceof TypeError)throw new Error('Нет соединения со хранилищем. Проверьте интернет')
+  if(e instanceof TypeError)throw new Error('Хранилище не отвечает. Проверьте CORS в Supabase: Project Settings → API → Allowed Origins → добавьте https://channeldesk.vercel.app (или *)')
   throw e
  }finally{clearTimeout(timer)}
 }
