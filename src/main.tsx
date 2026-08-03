@@ -9,6 +9,7 @@ try {
   if (typeof tg?.expand === 'function') tg.expand()
   if (typeof tg?.setHeaderColor === 'function') tg.setHeaderColor('#090b10')
   if (typeof tg?.setBackgroundColor === 'function') tg.setBackgroundColor('#090b10')
+  document.title = 'ChannelDesk v0.6.0'
 } catch {}
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: string | null }> {
