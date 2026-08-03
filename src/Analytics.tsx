@@ -208,6 +208,14 @@ export default function Analytics({ workspaceId, channels, onBack, onError }: Pr
         <article className="analytics-kpi"><span>Переходы</span><strong>{formattedNumber(summary?.clicks || 0)}</strong></article>
       </div>
 
+      <section className="analytics-card analytics-telegram-card">
+        <div className="analytics-section-heading"><div><strong>Статистика Telegram</strong><span>Детальные показатели через собственную MTProto-сессию</span></div><span className="analytics-source-badge">MTProto</span></div>
+        {(overview?.mtproto || []).length === 0 ? <p className="analytics-telegram-empty">Сборщик ещё не подключён или статистика для канала недоступна.</p> : <div className="analytics-telegram-list">{overview?.mtproto.map(row => <article className="analytics-telegram-row" key={row.id}>
+          <div className="analytics-telegram-title"><strong>{row.channel_title || channelName(row.channel_id)}</strong><span>Обновлено {shortDate(row.captured_at.slice(0, 10))}</span></div>
+          <div className="analytics-telegram-values"><div><span>Подписчики</span><strong>{formattedNumber(row.followers_current)}</strong></div><div><span>Просмотров/пост</span><strong>{Number(row.views_per_post || 0).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}</strong></div><div><span>Репостов/пост</span><strong>{Number(row.shares_per_post || 0).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}</strong></div><div><span>Реакций/пост</span><strong>{Number(row.reactions_per_post || 0).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}</strong></div></div>
+        </article>)}</div>}
+      </section>
+
       <section className="analytics-card analytics-chart-card">
         <div className="analytics-section-heading"><strong>Динамика</strong><span className="analytics-legend"><i className="legend-income" /> просмотры <i className="legend-expense" /> охват</span></div>
         <div className={`analytics-chart-scroll${series.length === 0 ? ' is-empty' : ''}`}>
@@ -246,7 +254,7 @@ export default function Analytics({ workspaceId, channels, onBack, onError }: Pr
         <div className="analytics-section-heading"><strong>Метрики</strong><span className="analytics-count">{overview?.metrics.length || 0}</span></div>
         {(overview?.metrics || []).length === 0 ? <div className="empty"><p>Метрик пока нет. Добавьте первую — статистика не кусается.</p></div> : overview?.metrics.slice().reverse().slice(0, 20).map(row => <article className="analytics-row" key={row.id}>
           <div className="analytics-row-main"><strong>{shortDate(row.metric_date)} · {row.channel_title || channelName(row.channel_id)}</strong><span>{formattedNumber(row.subscribers)} подписчиков · {formattedNumber(row.views)} просмотров · охват {formattedNumber(row.reach)}</span></div>
-          <span className="status status-in_progress">{row.source === 'bot_api' ? 'Bot API' : 'вручную'}</span>
+          <span className="status status-in_progress">{row.source === 'mtproto' ? 'MTProto' : row.source === 'bot_api' ? 'Bot API' : 'вручную'}</span>
         </article>)}
       </section>
 

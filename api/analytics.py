@@ -14,7 +14,7 @@ from api.workspaces import audit
 
 router = APIRouter(prefix='/api', tags=['analytics'])
 
-METRIC_SOURCES = {'manual', 'bot_api'}
+METRIC_SOURCES = {'manual', 'bot_api', 'mtproto'}
 
 
 class MetricCreate(BaseModel):
@@ -138,17 +138,28 @@ def analytics_overview(workspace_id: int, channel_id: int | None = None,
         link_sql += ' AND l.channel_id=%s'
         link_params.append(channel_id)
     link_sql += ' ORDER BY l.created_at DESC, l.id DESC'
+    stats_params: list = [workspace_id, start, end]
+    stats_sql = """SELECT DISTINCT ON (s.channel_id) s.*, c.title AS channel_title
+                  FROM cd_channel_stats_snapshots s
+                  JOIN cd_channels c ON c.id=s.channel_id
+                  WHERE s.workspace_id=%s AND s.captured_at >= %s AND s.captured_at < (%s + interval '1 day')"""
+    if channel_id is not None:
+        stats_sql += ' AND s.channel_id=%s'
+        stats_params.append(channel_id)
+    stats_sql += ' ORDER BY s.channel_id, s.captured_at DESC'
     with connect() as conn, conn.cursor() as cur:
         cur.execute(metric_sql, metric_params)
         metrics = cur.fetchall() or []
         cur.execute(link_sql, link_params)
         links = cur.fetchall() or []
+        cur.execute(stats_sql, stats_params)
+        mtproto = cur.fetchall() or []
     link_summary = {
         'clicks': sum(int(row.get('clicks') or 0) for row in links),
         'conversions': sum(int(row.get('conversions') or 0) for row in links),
         'links': len(links),
     }
-    return {'from_date': start, 'to_date': end, 'metrics': metrics, 'links': links,
+    return {'from_date': start, 'to_date': end, 'metrics': metrics, 'links': links, 'mtproto': mtproto,
             'summary': {**_metric_summary(metrics), **link_summary}}
 
 
@@ -158,6 +169,14 @@ def list_metrics(workspace_id: int, channel_id: int | None = None,
                  user: dict = Depends(current_user)):
     result = analytics_overview(workspace_id, channel_id, from_date, to_date, user)
     return result['metrics']
+
+
+@router.get('/workspaces/{workspace_id}/analytics/mtproto')
+def list_mtproto_snapshots(workspace_id: int, channel_id: int | None = None,
+                           from_date: date | None = None, to_date: date | None = None,
+                           user: dict = Depends(current_user)):
+    result = analytics_overview(workspace_id, channel_id, from_date, to_date, user)
+    return result['mtproto']
 
 
 @router.post('/workspaces/{workspace_id}/analytics/metrics', status_code=201)

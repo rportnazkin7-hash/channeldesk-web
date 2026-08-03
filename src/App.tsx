@@ -4,7 +4,7 @@ import { api,type Workspace,type Pending,type Channel,type Member,type Invite,ty
 import Statistics from './Statistics'
 import Analytics from './Analytics'
 
-const APP_VERSION = 'v0.23.0'
+const APP_VERSION = 'v0.24.0'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
