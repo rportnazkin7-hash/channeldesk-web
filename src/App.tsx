@@ -1,13 +1,23 @@
 import { useEffect,useState } from 'react'
-import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText } from 'lucide-react'
-import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post } from './api'
+import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus } from 'lucide-react'
+import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button } from './api'
 
-const APP_VERSION = 'v0.7.1'
+const APP_VERSION = 'v0.8.0'
 type Tab = 'overview'|'calendar'|'create'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
 
 function buzz(){try{window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')}catch{}}
+function dayKey(d:Date){return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`}
+function postDayKey(p:Post){const d=p.scheduled_at?new Date(p.scheduled_at):new Date(p.created_at);return dayKey(d)}
+function monthGrid(year:number,month:number):(Date|null)[]{
+ const first=new Date(year,month,1);const start=(first.getDay()+6)%7
+ const days=new Date(year,month+1,0).getDate();const cells:(Date|null)[]=[]
+ for(let i=0;i<start;i++)cells.push(null)
+ for(let d=1;d<=days;d++)cells.push(new Date(year,month,d))
+ return cells
+}
+function fmtDate(s:string){try{return new Date(s).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}catch{return s}}
 
 function errorHint(msg:string):string{
  if(msg.includes('401')) return 'Telegram-авторизация не получена. Откройте приложение через Telegram (кнопка WebApp у @channel_desk_bot), а не через браузер.'
@@ -22,8 +32,12 @@ export default function App(){
  const [tab,setTab]=useState<Tab>('overview')
  const [spaces,setSpaces]=useState<Workspace[]>([]),[active,setActive]=useState<Workspace|null>(null),[pending,setPending]=useState<Pending[]>([]),[channels,setChannels]=useState<Channel[]>([]),[members,setMembers]=useState<Member[]>([]),[invite,setInvite]=useState<Invite|null>(null),[copied,setCopied]=useState(false),[joined,setJoined]=useState<{workspace_name:string;role:string}|null>(null),[name,setName]=useState('Моё агентство'),[error,setError]=useState(''),[loading,setLoading]=useState(true)
  const [posts,setPosts]=useState<Post[]>([]),[newTitle,setNewTitle]=useState(''),[newText,setNewText]=useState(''),[draftChannel,setDraftChannel]=useState<number|null>(null),[busy,setBusy]=useState(false)
+ const [calYear,setCalYear]=useState(new Date().getFullYear()),[calMonth,setCalMonth]=useState(new Date().getMonth()),[selectedDay,setSelectedDay]=useState<Date|null>(null)
+ const [openPost,setOpenPost]=useState<number|null>(null),[comments,setComments]=useState<Record<number,Comment[]>>({}),[versions,setVersions]=useState<Record<number,Version[]>>({}),[commentText,setCommentText]=useState('')
+ const [templates,setTemplates]=useState<Template[]>([]),[newTplName,setNewTplName]=useState(''),[btnText,setBtnText]=useState(''),[btnUrl,setBtnUrl]=useState('')
  const hasInitData=!!(window.Telegram?.WebApp?.initData)
- async function load(){setLoading(true);setError('');try{const s=await api.workspaces();setSpaces(s);const a=active&&s.some(x=>x.id===active.id)?active:s[0]||null;setActive(a);const [p,c,m,po]=await Promise.all([api.pending(),a?api.channels(a.id):Promise.resolve([]),a?api.members(a.id):Promise.resolve([]),a?api.posts(a.id):Promise.resolve([])]);setPending(p);setChannels(c);setMembers(m);setPosts(po)}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки')}finally{setLoading(false)}}
+
+ async function load(){setLoading(true);setError('');try{const s=await api.workspaces();setSpaces(s);const a=active&&s.some(x=>x.id===active.id)?active:s[0]||null;setActive(a);const [p,c,m,po,t]=await Promise.all([api.pending(),a?api.channels(a.id):Promise.resolve([]),a?api.members(a.id):Promise.resolve([]),a?api.posts(a.id):Promise.resolve([]),a?api.templates(a.id):Promise.resolve([])]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setOpenPost(null)}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки')}finally{setLoading(false)}}
  useEffect(()=>{const sp=window.Telegram?.WebApp?.initDataUnsafe?.start_param||'';if(sp.startsWith('invite_')){api.acceptInvite(sp.slice('invite_'.length)).then(res=>{setJoined({workspace_name:res.workspace_name,role:res.role});return load()}).catch(e=>{setError(e instanceof Error?e.message:'Ошибка принятия приглашения');return load()})}else{load()}},[])
  async function create(){buzz();try{await api.createWorkspace(name);setName('Моё агентство');await load();setTab('overview')}catch(e){setError(e instanceof Error?e.message:'Ошибка')}}
  async function connect(id:number){buzz();if(!active)return;try{await api.connect(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка подключения')}}
@@ -32,10 +46,70 @@ export default function App(){
  function goSection(id:string){buzz();setTab('overview');setTimeout(()=>{document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'})},80)}
  async function createDraft(){buzz();if(!active)return;setBusy(true);setError('');try{await api.createPost(active.id,{title:newTitle,text:newText,channel_id:draftChannel});setNewTitle('');setNewText('');setDraftChannel(null);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания черновика')}finally{setBusy(false)}}
  async function actPost(id:number,kind:'submit'|'approve'|'changes'|'schedule'|'now'|'cancel'){buzz();if(!active)return;setBusy(true);setError('');try{const w=active.id;if(kind==='submit')await api.submitPost(w,id);if(kind==='approve')await api.approvePost(w,id);if(kind==='changes')await api.requestChanges(w,id);if(kind==='schedule')await api.schedulePost(w,id,new Date(Date.now()+3600000).toISOString());if(kind==='now')await api.publishNow(w,id);if(kind==='cancel')await api.cancelPost(w,id);await load();if(kind==='now')setTimeout(()=>{load()},5000)}catch(e){setError(e instanceof Error?e.message:'Ошибка операции')}finally{setBusy(false)}}
+ async function openDetails(id:number){buzz();if(!active)return;const w=active.id;setOpenPost(openPost===id?null:id);if(openPost!==id){try{const [cm,vs]=await Promise.all([api.comments(w,id),api.versions(w,id)]);setComments(prev=>({...prev,[id]:cm}));setVersions(prev=>({...prev,[id]:vs}))}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки деталей')}}}
+ async function addCommentTo(id:number){buzz();if(!active||!commentText.trim())return;const w=active.id;try{await api.addComment(w,id,commentText.trim());setCommentText('');const cm=await api.comments(w,id);setComments(prev=>({...prev,[id]:cm}))}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления комментария')}}
+ async function addButtonTo(id:number){buzz();if(!active||!btnText.trim()||!btnUrl.trim())return;const w=active.id;try{const post=posts.find(p=>p.id===id);const cur=post?.buttons||[];const next=[...cur,[{text:btnText.trim(),url:btnUrl.trim()}]];await api.updatePost(w,id,{buttons:next});setBtnText('');setBtnUrl('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления кнопки')}}
+ async function useTemplate(t:Template){buzz();setNewTitle(t.title);setNewText(t.text);setTab('calendar');setTimeout(()=>{document.getElementById('draft-form')?.scrollIntoView({behavior:'smooth'})},80)}
+ async function saveTemplate(){buzz();if(!active||!newTplName.trim())return;try{await api.createTemplate(active.id,{name:newTplName.trim(),title:newTitle,text:newText});setNewTplName('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка сохранения шаблона')}}
+ async function delTemplate(id:number){buzz();if(!active)return;try{await api.deleteTemplate(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления шаблона')}}
  const canManage=active?.role==='owner'||active?.role==='admin'
  const canReview=active?.role==='owner'||active?.role==='admin'||active?.role==='editor'
  const canSchedule=canReview||active?.role==='ad_manager'
  const hint=error?errorHint(error):''
+ const todayKey=dayKey(new Date())
+ const calCells=monthGrid(calYear,calMonth)
+ const dayPosts=selectedDay?posts.filter(p=>postDayKey(p)===dayKey(selectedDay)):posts
+
+ function renderPostCard(p:Post){
+  const open=openPost===p.id
+  return <article key={p.id} style={{padding:'14px 0',borderBottom:'1px solid #252b36'}}>
+   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
+    <strong style={{fontSize:14}}>{p.title||'(без заголовка)'}</strong>
+    <span className={"status status-"+p.status}>{STATUS_LABEL[p.status]||p.status}</span>
+   </div>
+   <p style={{color:'#8d96a8',fontSize:12,margin:'6px 0 0'}}>
+    {p.channel_title||'без канала'}
+    {p.scheduled_at?` · ${fmtDate(p.scheduled_at)}`:''}
+    {p.author_username?` · @${p.author_username}`:''}
+   </p>
+   {p.text&&<p style={{fontSize:13,margin:'8px 0 0',lineHeight:1.5}}>{p.text.length>160?p.text.slice(0,160)+'…':p.text}</p>}
+   {p.buttons&&p.buttons.length>0&&<div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:8}}>{p.buttons.flat().map((b,i)=><span key={i} className="btn-chip">🔗 {b.text}</span>)}</div>}
+   <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
+    {['draft','in_progress','idea','changes_requested'].includes(p.status)&&<button onClick={()=>actPost(p.id,'submit')} disabled={busy}><Send size={14}/> На согласование</button>}
+    {p.status==='review'&&canReview&&<><button onClick={()=>actPost(p.id,'approve')} disabled={busy}>✓ Одобрить</button><button onClick={()=>actPost(p.id,'changes')} disabled={busy}>Правки</button></>}
+    {p.status==='approved'&&canSchedule&&<><button onClick={()=>actPost(p.id,'now')} disabled={busy}><Send size={14}/> Опубликовать сейчас</button><button onClick={()=>actPost(p.id,'schedule')} disabled={busy}>⏱ +1 час</button></>}
+    {p.status==='scheduled'&&canSchedule&&<button onClick={()=>actPost(p.id,'now')} disabled={busy}><Send size={14}/> Опубликовать сейчас</button>}
+    {p.status==='failed'&&canSchedule&&<button onClick={()=>actPost(p.id,'now')} disabled={busy}><Send size={14}/> Повторить</button>}
+    {p.status==='cancelled'&&canSchedule&&<button onClick={()=>actPost(p.id,'now')} disabled={busy}><Send size={14}/> Возобновить</button>}
+    {p.status==='failed'&&p.last_error&&<p style={{color:'#ff9b9b',fontSize:11,marginTop:8,width:'100%'}}>Причина: {p.last_error}</p>}
+    {!['published','cancelled','publishing'].includes(p.status)&&<button onClick={()=>actPost(p.id,'cancel')} disabled={busy} style={{opacity:.7}}>Отменить</button>}
+    <button onClick={()=>openDetails(p.id)} disabled={busy} style={{opacity:.8}}>{open?'Свернуть':'Подробнее'}</button>
+   </div>
+   {open&&<div style={{marginTop:12,padding:12,borderRadius:14,background:'#0d1119',border:'1px solid #222936'}}>
+    {(p.status==='draft'||p.status==='in_progress'||p.status==='idea')&&<div style={{marginBottom:12}}>
+     <strong style={{fontSize:13}}>Кнопка (URL)</strong>
+     <div style={{display:'flex',gap:8,marginTop:8}}>
+      <input placeholder="Текст кнопки" value={btnText} onChange={e=>setBtnText(e.target.value)} style={{flex:1,padding:10,borderRadius:10,border:'1px solid #445',background:'#111722',color:'white',fontSize:13}}/>
+      <input placeholder="https://" value={btnUrl} onChange={e=>setBtnUrl(e.target.value)} style={{flex:1.5,padding:10,borderRadius:10,border:'1px solid #445',background:'#111722',color:'white',fontSize:13}}/>
+      <button onClick={()=>addButtonTo(p.id)} disabled={busy||!btnText.trim()||!btnUrl.trim()}><Plus size={15}/></button>
+     </div>
+    </div>}
+    <div style={{marginBottom:12}}>
+     <strong style={{fontSize:13,display:'flex',alignItems:'center',gap:6}}><MessageSquare size={14}/> Комментарии</strong>
+     <div style={{display:'flex',gap:8,marginTop:8}}>
+      <input placeholder="Комментарий…" value={commentText} onChange={e=>setCommentText(e.target.value)} style={{flex:1,padding:10,borderRadius:10,border:'1px solid #445',background:'#111722',color:'white',fontSize:13}}/>
+      <button onClick={()=>addCommentTo(p.id)} disabled={busy||!commentText.trim()}>Отправить</button>
+     </div>
+     {(comments[p.id]||[]).length?comments[p.id].map(cm=><div key={cm.id} style={{marginTop:8,fontSize:12}}><span style={{color:'#8cb3ff'}}>{cm.first_name||cm.username||'?'}:</span> {cm.text}<div style={{color:'#5b6475',fontSize:10}}>{fmtDate(cm.created_at)}</div></div>):<p style={{color:'#5b6475',fontSize:12,marginTop:8}}>Комментариев пока нет.</p>}
+    </div>
+    <div>
+     <strong style={{fontSize:13,display:'flex',alignItems:'center',gap:6}}><History size={14}/> Версии</strong>
+     {(versions[p.id]||[]).length?versions[p.id].slice(0,5).map(v=><div key={v.id} style={{marginTop:8,fontSize:12,color:'#aeb6c8'}}><span style={{color:'#5b6475'}}>{fmtDate(v.created_at)}</span> · {v.title||'(без заголовка)'} · {(v.text||'').slice(0,60)}{v.text&&v.text.length>60?'…':''}</div>):<p style={{color:'#5b6475',fontSize:12,marginTop:8}}>Версий пока нет.</p>}
+    </div>
+   </div>}
+  </article>
+ }
+
  return <div className="app"><header><div><span className="eyebrow">РАБОЧЕЕ ПРОСТРАНСТВО</span><h1>ChannelDesk</h1></div><button className="workspace" onClick={()=>{buzz();load()}} title="Обновить"><RefreshCw size={15}/></button></header><main>
   {!hasInitData&&<section className="panel warn"><strong>⚠ Приложение работает только внутри Telegram</strong><p>Откройте его через бота <code>@channel_desk_bot</code> (кнопка «Открыть ChannelDesk») — так Telegram передаст авторизацию.</p></section>}
   {error&&<section className="panel err"><strong>{error}</strong>{hint&&<p className="hint">{hint}</p>}</section>}
@@ -57,9 +131,9 @@ export default function App(){
 
   {tab==='calendar'&&<>
    {!active?<section className="panel"><div className="empty"><div className="empty-icon"><CalendarDays/></div><h3>Создайте рабочее пространство</h3><p>Календарь публикаций появится после создания пространства и подключения канала.</p></div></section>:<>
-    <section className="panel"><div className="panel-title"><h2>Новый черновик</h2><FileText size={20}/></div>
+    <section id="draft-form" className="panel"><div className="panel-title"><h2>Новый черновик</h2><FileText size={20}/></div>
      <input placeholder="Заголовок" value={newTitle} onChange={e=>setNewTitle(e.target.value)} style={{width:'100%',padding:12,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white',margin:'12px 0 10px'}}/>
-     <textarea placeholder="Текст (поддерживается Telegram HTML: <b>, <i>, <a href=...>)" value={newText} onChange={e=>setNewText(e.target.value)} rows={4} style={{width:'100%',padding:12,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white',resize:'vertical'}}/>
+     <textarea placeholder="Текст (Telegram HTML: <b>, <i>, <a href=…>)" value={newText} onChange={e=>setNewText(e.target.value)} rows={3} style={{width:'100%',padding:12,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white',resize:'vertical'}}/>
      <div style={{display:'flex',gap:10,alignItems:'center',margin:'12px 0'}}>
       <select value={draftChannel??''} onChange={e=>setDraftChannel(e.target.value?Number(e.target.value):null)} style={{flex:1,padding:12,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white'}}>
        <option value="">— без канала —</option>
@@ -67,29 +141,18 @@ export default function App(){
       </select>
       <button onClick={createDraft} disabled={busy||!newTitle.trim()}><CirclePlus size={18}/> Черновик</button>
      </div>
+     {templates.length>0&&<div style={{marginTop:8}}><span style={{color:'#8d96a8',fontSize:12}}>Шаблоны: </span>{templates.map(t=><button key={t.id} onClick={()=>useTemplate(t)} disabled={busy} className="chip-btn">{t.name}</button>)}</div>}
     </section>
+
+    <section className="panel" style={{marginTop:14}}><div className="panel-title"><h2>{calMonth+1}/{calYear}</h2><div style={{display:'flex',gap:6}}><button onClick={()=>{buzz();setCalMonth(m=>m===0?(setCalYear(y=>y-1),11):m-1)}} disabled={busy} className="icon-btn"><ChevronLeft size={16}/></button><button onClick={()=>{buzz();setCalMonth(m=>m===11?(setCalYear(y=>y+1),0):m+1)}} disabled={busy} className="icon-btn"><ChevronRight size={16}/></button></div></div>
+     <div className="cal-grid">{['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(d=><div key={d} className="cal-dow">{d}</div>)}
+      {calCells.map((d,i)=>d?(()=>{const k=dayKey(d);const has=posts.some(p=>postDayKey(p)===k);const sel=selectedDay&&dayKey(selectedDay)===k;return <button key={i} className={"cal-day"+(has?' has':'')+(sel?' sel':'')+(k===todayKey?' today':'')} onClick={()=>{buzz();setSelectedDay(sel?null:d)}}><span>{d.getDate()}</span>{has&&<i/>}</button>})():<div key={i} className="cal-day empty"/>)}
+     </div>
+     <div style={{marginTop:6,fontSize:11,color:'#5b6475'}}>{selectedDay?`Посты за ${selectedDay.getDate()}.${selectedDay.getMonth()+1}`:'Показаны все посты · выберите день для фильтра'}</div>
+    </section>
+
     <section className="panel" style={{marginTop:14}}><div className="panel-title"><h2>Публикации</h2><Clock size={20}/></div>
-     {posts.length===0?<div className="empty"><p>Пока нет публикаций. Создайте первый черновик выше.</p></div>:posts.map(p=><article key={p.id} style={{padding:'14px 0',borderBottom:'1px solid #252b36'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
-       <strong style={{fontSize:14}}>{p.title||'(без заголовка)'}</strong>
-       <span className={"status status-"+p.status}>{STATUS_LABEL[p.status]||p.status}</span>
-      </div>
-      <p style={{color:'#8d96a8',fontSize:12,margin:'6px 0 0'}}>
-       {p.channel_title||'без канала'}
-       {p.scheduled_at?` · ${new Date(p.scheduled_at).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}`:''}
-       {p.author_username?` · @${p.author_username}`:''}
-      </p>
-      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
-       {['draft','in_progress','idea','changes_requested'].includes(p.status)&&<button onClick={()=>actPost(p.id,'submit')} disabled={busy}><Send size={14}/> На согласование</button>}
-       {p.status==='review'&&canReview&&<><button onClick={()=>actPost(p.id,'approve')} disabled={busy}>✓ Одобрить</button><button onClick={()=>actPost(p.id,'changes')} disabled={busy}>Правки</button></>}
-       {p.status==='approved'&&canSchedule&&<><button onClick={()=>actPost(p.id,'now')} disabled={busy}><Send size={14}/> Опубликовать сейчас</button><button onClick={()=>actPost(p.id,'schedule')} disabled={busy}>⏱ +1 час</button></>}
-       {p.status==='scheduled'&&canSchedule&&<button onClick={()=>actPost(p.id,'now')} disabled={busy}><Send size={14}/> Опубликовать сейчас</button>}
-       {p.status==='failed'&&canSchedule&&<button onClick={()=>actPost(p.id,'now')} disabled={busy}><Send size={14}/> Повторить публикацию</button>}
-       {p.status==='cancelled'&&canSchedule&&<button onClick={()=>actPost(p.id,'now')} disabled={busy}><Send size={14}/> Возобновить</button>}
-       {p.status==='failed'&&p.last_error&&<p style={{color:'#ff9b9b',fontSize:11,marginTop:8,width:'100%'}}>Причина: {p.last_error}</p>}
-       {!['published','cancelled','publishing'].includes(p.status)&&<button onClick={()=>actPost(p.id,'cancel')} disabled={busy} style={{opacity:.7}}>Отменить</button>}
-      </div>
-     </article>)}
+     {dayPosts.length===0?<div className="empty"><p>Нет публикаций.</p></div>:dayPosts.map(renderPostCard)}
     </section>
    </>}
   </>}
@@ -98,6 +161,12 @@ export default function App(){
    {active?<>
     <button className="invite-btn" onClick={()=>{buzz();setTab('calendar')}}><FileText size={15}/> Новая публикация</button>
     <button className="invite-btn" disabled style={{opacity:.5}}><Megaphone size={15}/> Рекламный слот (Этап C)</button>
+    <div style={{margin:'18px 0 10px'}}><strong>Сохранить текущий черновик как шаблон</strong></div>
+    <div style={{display:'flex',gap:8}}>
+     <input placeholder="Название шаблона" value={newTplName} onChange={e=>setNewTplName(e.target.value)} style={{flex:1,padding:12,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white'}}/>
+     <button onClick={saveTemplate} disabled={busy||!newTplName.trim()||!newText.trim()}>Сохранить</button>
+    </div>
+    {templates.length>0&&<div style={{marginTop:14}}>{templates.map(t=><div key={t.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid #222936'}}><div><strong style={{fontSize:14}}>{t.name}</strong><div style={{color:'#8d96a8',fontSize:12}}>{t.title||'(без заголовка)'}</div></div><div style={{display:'flex',gap:6}}><button onClick={()=>useTemplate(t)} disabled={busy} className="icon-btn"><FileText size={15}/></button><button onClick={()=>delTemplate(t.id)} disabled={busy} className="icon-btn danger"><Trash2 size={15}/></button></div></div>)}</div>}
     <div style={{margin:'18px 0 10px'}}><strong>Новое рабочее пространство</strong></div>
     <input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white',marginBottom:12}}/>
     <button onClick={create}><CirclePlus size={19}/> Создать пространство</button>

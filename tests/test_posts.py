@@ -187,6 +187,55 @@ def test_draft_with_approval_rejected(monkeypatch):
     assert 'одобрени' in r.json()['detail']
 
 
+def test_create_post_with_buttons(monkeypatch):
+    created = dict(POST_ROW, status='draft', buttons=[[{'text': 'Открыть', 'url': 'https://x.ru'}]])
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, {'id': 5}, created])
+    monkeypatch.setattr('api.posts.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/posts',
+                    json={'title': 'Кнопки', 'text': 'текст', 'channel_id': 5,
+                          'buttons': [[{'text': 'Открыть', 'url': 'https://x.ru'}]]},
+                    headers=auth_headers())
+    assert r.status_code == 201
+    assert r.json()['buttons'] == [[{'text': 'Открыть', 'url': 'https://x.ru'}]]
+    # кнопки записаны json-ом в INSERT
+    calls = [call for cur in conn.cursors for call in cur.calls]
+    insert = next(sql for sql, _ in calls if 'INSERT INTO cd_posts' in sql)
+    assert 'buttons' in insert
+
+
+def test_create_post_button_without_url_rejected(monkeypatch):
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, {'id': 5}])
+    monkeypatch.setattr('api.posts.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/posts',
+                    json={'title': 'x', 'text': 'y', 'buttons': [[{'text': 'Без ссылки'}]]},
+                    headers=auth_headers())
+    assert r.status_code == 422
+    assert 'url' in r.json()['detail'].lower()
+
+
+def test_templates_crud(monkeypatch):
+    template = {'id': 1, 'workspace_id': 3, 'name': 'Анонс', 'title': 'Заголовок', 'text': 'Текст анонса'}
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, template])
+    monkeypatch.setattr('api.posts.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/templates', json={'name': 'Анонс', 'text': 'Текст анонса'},
+                    headers=auth_headers())
+    assert r.status_code == 201
+    assert r.json()['name'] == 'Анонс'
+
+
+def test_list_posts_calendar_filter(monkeypatch):
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, [POST_ROW]])
+    monkeypatch.setattr('api.posts.connect', lambda: conn)
+    r = client.get('/api/workspaces/3/posts',
+                   params={'date_from': '2026-08-01T00:00:00Z', 'date_to': '2026-08-31T23:59:59Z'},
+                   headers=auth_headers())
+    assert r.status_code == 200
+    assert len(r.json()) == 1
+    calls = [call for cur in conn.cursors for call in cur.calls]
+    select = next(sql for sql, _ in calls if 'FROM cd_posts' in sql)
+    assert 'scheduled_at >= %s' in select and 'scheduled_at <= %s' in select
+
+
 def test_publish_now_sets_scheduled(monkeypatch):
     approved = dict(POST_ROW, status='approved')
     scheduled = dict(POST_ROW, status='scheduled', publish_key='nowkey', scheduled_at=None)
