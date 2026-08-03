@@ -1,8 +1,8 @@
 import { useCallback,useEffect,useState } from 'react'
 import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X } from 'lucide-react'
-import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary } from './api'
+import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit } from './api'
 
-const APP_VERSION = 'v0.12.0'
+const APP_VERSION = 'v0.13.0'
 type Tab = 'overview'|'calendar'|'create'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
@@ -46,11 +46,14 @@ export default function App(){
  const [bkAdv,setBkAdv]=useState<number|null>(null),[bkChannel,setBkChannel]=useState<number|null>(null),[bkCost,setBkCost]=useState(''),[bkDate,setBkDate]=useState(''),[bkErid,setBkErid]=useState(''),[bkNoErid,setBkNoErid]=useState(false)
  const [finType,setFinType]=useState<'income'|'expense'>('income'),[finAmount,setFinAmount]=useState(''),[finDesc,setFinDesc]=useState('')
  const [adsTab,setAdsTab]=useState<'bookings'|'advertisers'|'finance'>('bookings')
+ const [mediaKits,setMediaKits]=useState<MediaKit[]>([])
+ const [showMediaKits,setShowMediaKits]=useState(false)
+ const [mkName,setMkName]=useState(''),[mkChannel,setMkChannel]=useState<number|null>(null),[mkDesc,setMkDesc]=useState(''),[mkSubs,setMkSubs]=useState(''),[mkPrice,setMkPrice]=useState('')
  const hasInitData=!!(window.Telegram?.WebApp?.initData)
 
- async function load(){setLoading(true);setError('');try{const s=await api.workspaces();setSpaces(s);const a=active&&s.some(x=>x.id===active.id)?active:s[0]||null;setActive(a);const [p,c,m,po,t,ad,bk,fs]=await Promise.all([api.pending(),a?api.channels(a.id):Promise.resolve([]),a?api.members(a.id):Promise.resolve([]),a?api.posts(a.id):Promise.resolve([]),a?api.templates(a.id):Promise.resolve([]),a?api.advertisers(a.id):Promise.resolve([]),a?api.bookings(a.id):Promise.resolve([]),a?api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1):Promise.resolve(null)]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFinSummary(fs);setOpenPost(null)}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки')}finally{setLoading(false)}}
+ async function load(){setLoading(true);setError('');try{const s=await api.workspaces();setSpaces(s);const a=active&&s.some(x=>x.id===active.id)?active:s[0]||null;setActive(a);const [p,c,m,po,t,ad,bk,fs,mk]=await Promise.all([api.pending(),a?api.channels(a.id):Promise.resolve([]),a?api.members(a.id):Promise.resolve([]),a?api.posts(a.id):Promise.resolve([]),a?api.templates(a.id):Promise.resolve([]),a?api.advertisers(a.id):Promise.resolve([]),a?api.bookings(a.id):Promise.resolve([]),a?api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1):Promise.resolve(null),a?api.mediaKits(a.id):Promise.resolve([])]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFinSummary(fs);setMediaKits(mk);setOpenPost(null)}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки')}finally{setLoading(false)}}
  // Тихий фоновый poll: обновляет данные без индикатора загрузки и без сброса открытых карточек.
- const refresh=useCallback(async ()=>{try{const s=await api.workspaces();const a=active&&s.some(x=>x.id===active.id)?active:s[0]||null;if(!a)return;const [p,c,m,po,t,ad,bk,fs]=await Promise.all([api.pending(),api.channels(a.id),api.members(a.id),api.posts(a.id),api.templates(a.id),api.advertisers(a.id),api.bookings(a.id),api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1)]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFinSummary(fs);setSpaces(s);setActive(a)}catch{/* фоновая ошибка не должна тревожить пользователя */}},[active])
+ const refresh=useCallback(async ()=>{try{const s=await api.workspaces();const a=active&&s.some(x=>x.id===active.id)?active:s[0]||null;if(!a)return;const [p,c,m,po,t,ad,bk,fs,mk]=await Promise.all([api.pending(),api.channels(a.id),api.members(a.id),api.posts(a.id),api.templates(a.id),api.advertisers(a.id),api.bookings(a.id),api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1),api.mediaKits(a.id)]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFinSummary(fs);setMediaKits(mk);setSpaces(s);setActive(a)}catch{/* фоновая ошибка не должна тревожить пользователя */}},[active])
  useEffect(()=>{const timer=setInterval(()=>{refresh()},3000);return ()=>clearInterval(timer)},[refresh])
  async function addAdvertiser(){buzz();if(!active)return;setError('');try{await api.createAdvertiser(active.id,{name:advName,notes:advContact});setAdvName('');setAdvContact('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления рекламодателя')}}
  async function delAdvertiser(id:number){buzz();if(!active)return;try{await api.deleteAdvertiser(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления рекламодателя')}}
@@ -58,6 +61,8 @@ export default function App(){
  async function payBooking(id:number){buzz();if(!active)return;try{await api.payBooking(active.id,id,'paid');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка отметки оплаты')}}
  async function delBooking(id:number){buzz();if(!active)return;try{await api.deleteBooking(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления брони')}}
  async function addFinance(){buzz();if(!active)return;setError('');try{await api.createTransaction(active.id,{type:finType,amount:Number(finAmount)||0,category:finType==='income'?'advertising':'other',description:finDesc});setFinAmount('');setFinDesc('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления транзакции')}}
+ async function addMediaKit(){buzz();if(!active)return;setError('');try{const stats={subscribers:mkSubs?Number(mkSubs):0};const pricing=mkPrice?[{format:'post',price:Number(mkPrice)||0}]:[];await api.createMediaKit(active.id,{name:mkName,channel_id:mkChannel,description:mkDesc,stats,pricing});setMkName('');setMkChannel(null);setMkDesc('');setMkSubs('');setMkPrice('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания медиакита')}}
+ async function delMediaKit(id:number){buzz();if(!active)return;try{await api.deleteMediaKit(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления медиакита')}}
  useEffect(()=>{const sp=window.Telegram?.WebApp?.initDataUnsafe?.start_param||'';if(sp.startsWith('invite_')){api.acceptInvite(sp.slice('invite_'.length)).then(res=>{setJoined({workspace_name:res.workspace_name,role:res.role});return load()}).catch(e=>{setError(e instanceof Error?e.message:'Ошибка принятия приглашения');return load()})}else{load()}},[])
  async function create(){buzz();try{await api.createWorkspace(name);setName('Моё агентство');await load();setTab('overview')}catch(e){setError(e instanceof Error?e.message:'Ошибка')}}
  async function connect(id:number){buzz();if(!active)return;try{await api.connect(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка подключения')}}
@@ -310,13 +315,46 @@ export default function App(){
    </>}
   </>}
 
-  {tab==='more'&&<section className="panel"><div className="panel-title"><h2>Ещё</h2><MoreHorizontal size={20}/></div>
+  {showMediaKits&&<section className="panel">
+   <div className="panel-title"><h2>Медиакиты</h2><ImageIcon size={20}/></div>
+   <button className="icon-btn" onClick={()=>{buzz();setShowMediaKits(false)}} style={{marginBottom:12}}>← Назад</button>
+   <label className="form-label">Название</label>
+   <input className="field" placeholder="Медиакит канала «Новости»" value={mkName} onChange={e=>setMkName(e.target.value)}/>
+   <label className="form-label">Канал</label>
+   <select className="field" value={mkChannel??''} onChange={e=>setMkChannel(e.target.value?Number(e.target.value):null)}>
+    <option value="">— без канала —</option>
+    {channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}
+   </select>
+   <label className="form-label">Описание</label>
+   <textarea className="field" rows={2} placeholder="О канале, аудитории…" value={mkDesc} onChange={e=>setMkDesc(e.target.value)}/>
+   <div className="btn-row" style={{marginTop:14}}>
+    <input className="field" placeholder="Подписчики" type="number" value={mkSubs} onChange={e=>setMkSubs(e.target.value)}/>
+    <input className="field" placeholder="Цена поста, ₽" type="number" value={mkPrice} onChange={e=>setMkPrice(e.target.value)}/>
+   </div>
+   <button className="primary-btn" onClick={addMediaKit} disabled={!mkName.trim()}><Plus size={17}/> Создать медиакит</button>
+   <div style={{marginTop:18}}>
+    {mediaKits.length===0?<div className="empty"><p>Медиакитов пока нет.</p></div>:mediaKits.map(k=><article key={k.id} style={{padding:'13px 0',borderBottom:'1px solid #222936'}}>
+     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
+      <strong style={{fontSize:14}}>{k.name}</strong>
+      <button onClick={()=>delMediaKit(k.id)} disabled={busy} className="icon-btn danger" title="Удалить"><Trash2 size={14}/></button>
+     </div>
+     <p style={{color:'#8d96a8',fontSize:12,margin:'6px 0 0'}}>
+      {k.channel_title||'без канала'}
+      {k.stats&&typeof k.stats==='object'&&'subscribers' in k.stats&&(k.stats as Record<string,number>).subscribers?` · ${Number((k.stats as Record<string,number>).subscribers).toLocaleString('ru-RU')} подписчиков`:''}
+     </p>
+     {k.description&&<p style={{fontSize:13,margin:'6px 0 0',color:'#aeb6c8'}}>{k.description}</p>}
+     {Array.isArray(k.pricing)&&k.pricing.length>0&&<p style={{color:'#72d99f',fontSize:12,margin:'6px 0 0'}}>{(k.pricing[0] as {format?:string;price?:number}).format||'пост'}: {(k.pricing[0] as {price?:number}).price?.toLocaleString('ru-RU')} ₽</p>}
+    </article>)}
+   </div>
+  </section>}
+
+  {!showMediaKits&&tab==='more'&&<section className="panel"><div className="panel-title"><h2>Ещё</h2><MoreHorizontal size={20}/></div>
    {[
     {icon:Megaphone,label:'Каналы',desc:'Управление подключёнными каналами',action:()=>goSection('channels-section')},
     {icon:Users,label:'Команда',desc:'Участники и приглашения',action:()=>goSection('team-section')},
     {icon:Wallet,label:'Финансы',desc:'Доходы и расходы'},
     {icon:LineChart,label:'Аналитика',desc:'Отчёты по каналам'},
-    {icon:ImageIcon,label:'Медиакиты',desc:'Презентация для рекламодателей'},
+    {icon:ImageIcon,label:'Медиакиты',desc:'Презентация для рекламодателей',action:()=>{buzz();setShowMediaKits(true)}},
     {icon:Settings,label:'Настройки',desc:'Пространство и уведомления'},
    ].map(item=>{
     const I=item.icon

@@ -27,6 +27,7 @@ export type Advertiser={id:number;name:string;contact:Record<string,string>|null
 export type Booking={id:number;advertiser_id:number;channel_id:number|null;post_id:number|null;format:string;cost:number;currency:string;status:string;payment_status:string;publish_at:string|null;delete_at:string|null;erid:string|null;erid_required:boolean;materials_url:string|null;report_url:string|null;advertiser_name:string|null;channel_title:string|null}
 export type FinanceTx={id:number;booking_id:number|null;type:'income'|'expense';amount:number;currency:string;category:string;description:string;occurred_at:string}
 export type FinanceSummary={year:number;month:number;income:number;expense:number;profit:number;count:number}
+export type MediaKit={id:number;name:string;channel_id:number|null;channel_title:string|null;description:string;audience:Record<string,unknown>;stats:Record<string,unknown>;pricing:unknown[];contacts:Record<string,unknown>;is_active:boolean}
 export type UploadTicket={asset_id:number;file_url:string;upload_url:string;anon_key:string;bucket:string}
 async function uploadDirect(ticket:UploadTicket,file:File):Promise<void>{
  const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),90000)
@@ -78,4 +79,8 @@ export const api={
  deleteBooking:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/bookings/${id}`,{method:'DELETE'}),
  financeSummary:(wid:number,year:number,month:number)=>req<FinanceSummary>(`/api/workspaces/${wid}/finance/summary?year=${year}&month=${month}`),
  createTransaction:(wid:number,p:{type:'income'|'expense';amount:number;category?:string;description?:string})=>req<FinanceTx>(`/api/workspaces/${wid}/finance/transactions`,{method:'POST',body:JSON.stringify(p)}),
+ mediaKits:(wid:number)=>req<MediaKit[]>(`/api/workspaces/${wid}/media-kits`),
+ createMediaKit:(wid:number,p:{name:string;channel_id?:number|null;description?:string;stats?:Record<string,unknown>;pricing?:unknown[];contacts?:Record<string,unknown>})=>req<MediaKit>(`/api/workspaces/${wid}/media-kits`,{method:'POST',body:JSON.stringify(p)}),
+ updateMediaKit:(wid:number,id:number,p:Record<string,unknown>)=>req<MediaKit>(`/api/workspaces/${wid}/media-kits/${id}`,{method:'PATCH',body:JSON.stringify(p)}),
+ deleteMediaKit:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/media-kits/${id}`,{method:'DELETE'}),
 }

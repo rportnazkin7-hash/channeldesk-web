@@ -33,6 +33,10 @@ MATRIX: dict[str, frozenset[str]] = {
     'booking.manage': frozenset({'owner','admin','ad_manager'}),
     'finance.view': frozenset({'owner','admin','analyst','ad_manager'}),
     'finance.manage': frozenset({'owner','admin','ad_manager'}),
+
+    # Медиакиты (Этап C)
+    'media_kit.view': frozenset({'owner','admin','editor','author','designer','ad_manager','analyst','viewer'}),
+    'media_kit.manage': frozenset({'owner','admin','ad_manager','designer'}),
 }
 
 
