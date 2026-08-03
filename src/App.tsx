@@ -2,7 +2,7 @@ import { useCallback,useEffect,useState } from 'react'
 import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download } from 'lucide-react'
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit,type Task } from './api'
 
-const APP_VERSION = 'v0.16.0'
+const APP_VERSION = 'v0.16.1'
 type Tab = 'overview'|'calendar'|'create'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
@@ -34,7 +34,7 @@ function errorHint(msg:string):string{
 
 export default function App(){
  const [tab,setTab]=useState<Tab>('overview')
- const [spaces,setSpaces]=useState<Workspace[]>([]),[active,setActive]=useState<Workspace|null>(null),[pending,setPending]=useState<Pending[]>([]),[channels,setChannels]=useState<Channel[]>([]),[members,setMembers]=useState<Member[]>([]),[invite,setInvite]=useState<Invite|null>(null),[copied,setCopied]=useState(false),[joined,setJoined]=useState<{workspace_name:string;role:string}|null>(null),[exportMsg,setExportMsg]=useState(''),[name,setName]=useState('Моё агентство'),[error,setError]=useState(''),[loading,setLoading]=useState(true)
+ const [spaces,setSpaces]=useState<Workspace[]>([]),[active,setActive]=useState<Workspace|null>(null),[pending,setPending]=useState<Pending[]>([]),[channels,setChannels]=useState<Channel[]>([]),[members,setMembers]=useState<Member[]>([]),[invite,setInvite]=useState<Invite|null>(null),[copied,setCopied]=useState(false),[joined,setJoined]=useState<{workspace_name:string;role:string}|null>(null),[exportMsg,setExportMsg]=useState(''),[exportJobs,setExportJobs]=useState<Awaited<ReturnType<typeof api.exportsStatus>>>([]),[name,setName]=useState('Моё агентство'),[error,setError]=useState(''),[loading,setLoading]=useState(true)
  const [posts,setPosts]=useState<Post[]>([]),[newTitle,setNewTitle]=useState(''),[newText,setNewText]=useState(''),[draftChannel,setDraftChannel]=useState<number|null>(null),[busy,setBusy]=useState(false)
  const [draftBtns,setDraftBtns]=useState<Button[]>([]),[draftBtnText,setDraftBtnText]=useState(''),[draftBtnUrl,setDraftBtnUrl]=useState(''),[draftFiles,setDraftFiles]=useState<File[]>([])
  const [calYear,setCalYear]=useState(new Date().getFullYear()),[calMonth,setCalMonth]=useState(new Date().getMonth()),[selectedDay,setSelectedDay]=useState<Date|null>(null)
@@ -69,7 +69,8 @@ export default function App(){
  async function addTask(){buzz();if(!active)return;setError('');try{await api.createTask(active.id,{title:taskTitle,description:taskDesc,priority:taskPriority,due_at:taskDue?new Date(taskDue).toISOString():null});setTaskTitle('');setTaskDesc('');setTaskPriority('normal');setTaskDue('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания задачи')}}
  async function completeTask(id:number){buzz();if(!active)return;try{await api.completeTask(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка отметки задачи')}}
  async function delTask(id:number){buzz();if(!active)return;try{await api.deleteTask(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления задачи')}}
- async function sendExport(kind:'posts'|'bookings'|'finance',format:'csv'|'xlsx'|'pdf'){buzz();if(!active)return;setExportMsg('');try{const r=await api.requestExport(active.id,kind,format);setExportMsg(`Файл ${kind}.${format} будет отправлен ботом в Telegram в течение ~30 секунд`);setTimeout(()=>setExportMsg(''),8000)}catch(e){setError(e instanceof Error?e.message:'Ошибка экспорта')}}
+ async function sendExport(kind:'posts'|'bookings'|'finance',format:'csv'|'xlsx'|'pdf'){buzz();if(!active)return;setExportMsg('');try{const r=await api.requestExport(active.id,kind,format);setExportMsg(`Файл ${kind}.${format} будет отправлен ботом в Telegram в течение ~30 секунд`);setTimeout(()=>setExportMsg(''),8000);checkExports()}catch(e){setError(e instanceof Error?e.message:'Ошибка экспорта')}}
+ async function checkExports(){if(!active)return;try{const j=await api.exportsStatus(active.id);setExportJobs(j)}catch{}}
  useEffect(()=>{const sp=window.Telegram?.WebApp?.initDataUnsafe?.start_param||'';if(sp.startsWith('invite_')){api.acceptInvite(sp.slice('invite_'.length)).then(res=>{setJoined({workspace_name:res.workspace_name,role:res.role});return load()}).catch(e=>{setError(e instanceof Error?e.message:'Ошибка принятия приглашения');return load()})}else{load()}},[])
  async function create(){buzz();try{await api.createWorkspace(name);setName('Моё агентство');await load();setTab('overview')}catch(e){setError(e instanceof Error?e.message:'Ошибка')}}
  async function connect(id:number){buzz();if(!active)return;try{await api.connect(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка подключения')}}
@@ -157,7 +158,13 @@ export default function App(){
   {!hasInitData&&<section className="panel warn"><strong>⚠ Приложение работает только внутри Telegram</strong><p>Откройте его через бота <code>@channel_desk_bot</code> (кнопка «Открыть ChannelDesk») — так Telegram передаст авторизацию.</p></section>}
   {error&&<section className="panel err"><strong>{error}</strong>{hint&&<p className="hint">{hint}</p>}</section>}
   {joined&&<section className="panel ok">✓ Вы присоединились к «{joined.workspace_name}» (роль: {ROLE_LABEL[joined.role]||joined.role})</section>}
-  {exportMsg&&<section className="panel ok">{exportMsg}</section>}
+  {exportMsg&&<section className="panel ok">{exportMsg} <button className="icon-btn" style={{marginLeft:8}} onClick={()=>{buzz();checkExports()}}>Статус</button></section>}
+  {exportJobs.length>0&&<section className="panel" style={{marginTop:8}}><div className="panel-title"><h2>Экспорты</h2><Download size={16}/></div>
+   {exportJobs.map(j=><div key={j.id} style={{padding:'8px 0',borderBottom:'1px solid #222936',fontSize:12,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+    <span>{j.kind}.{j.format} — <b>{j.status==='done'?'отправлен':j.status==='processing'?'готовится…':j.status==='failed'?'ошибка':j.status}</b></span>
+    {j.status==='failed'&&j.error_text&&<span style={{color:'#ff9b9b'}}>{j.error_text.slice(0,80)}</span>}
+   </div>)}
+  </section>}
 
   {tab==='overview'&&<>
    {!active&&!loading?<section className="hero"><p>Создайте рабочее пространство агентства.</p><input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white',marginBottom:12}}/><button onClick={create}><CirclePlus size={19}/> Создать</button></section>:<>
