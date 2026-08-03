@@ -39,3 +39,22 @@ app.include_router(assets_router)
 @app.get('/api/health')
 def health():
     return {'ok': True, 'service': 'ChannelDesk API', 'version': '0.9.1'}
+
+
+@app.get('/api/health/storage')
+def health_storage():
+    """Диагностика хранилища: настроены ли env и доступен ли Supabase Storage.
+    Секреты не раскрываются — только статус."""
+    import urllib.request
+    url = os.getenv('SUPABASE_URL', '').strip().rstrip('/')
+    key = os.getenv('SUPABASE_SERVICE_ROLE_KEY', '').strip()
+    if not url or not key:
+        return {'configured': False, 'reason': 'SUPABASE_URL или SUPABASE_SERVICE_ROLE_KEY не заданы'}
+    try:
+        req = urllib.request.Request(f'{url}/storage/v1/bucket',
+                                     headers={'Authorization': f'Bearer {key}'})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return {'configured': True, 'ok': True, 'status': resp.status}
+    except Exception as exc:
+        return {'configured': True, 'ok': False,
+                'error': str(exc), 'errno': getattr(exc, 'errno', None)}

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 import json
 import os
 import urllib.error
@@ -108,12 +109,16 @@ async def upload_asset(workspace_id: int,
     storage_path = f'{workspace_id}/{uuid.uuid4().hex}{ext}'
     content_type = file.content_type or 'application/octet-stream'
     try:
-        _storage_post_object(url, key, BUCKET, storage_path, content_type, data)
+        # ВАЖНО: синхронный сетевой вызов — только в отдельном потоке (to_thread).
+        # Прямой вызов в event loop async-эндпоинта даёт [Errno 16] EBUSY на Vercel.
+        await asyncio.to_thread(_storage_post_object, url, key, BUCKET, storage_path, content_type, data)
     except urllib.error.HTTPError as exc:
         body = exc.read(300).decode('utf-8', 'replace')
         raise HTTPException(502, f'Хранилище вернуло ошибку {exc.code}: {body}')
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        raise HTTPException(503, f'Сеть до хранилища недоступна: {exc}')
+        errno = getattr(exc, 'errno', None)
+        reason = getattr(exc, 'reason', exc)
+        raise HTTPException(503, f'Сеть до хранилища недоступна: {reason} (errno={errno})')
     file_url = public_file_url(url, storage_path)
     with connect() as conn, conn.cursor() as cur:
         cur.execute("""INSERT INTO cd_content_assets(workspace_id,post_id,file_name,file_type,file_url,size_bytes,uploaded_by)
