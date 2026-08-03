@@ -57,17 +57,19 @@ def ensure_bucket() -> None:
     """Создаёт bucket и RLS-политику для прямой загрузки из браузера.
 
     Работает через БД (psycopg) — Storage API из Vercel недоступен ([Errno 16] EBUSY).
-    Политики разрешают только INSERT анонимам в этот bucket; список/удаление
-    идут через backend (который проверяет права).
+    Ошибки печатаются в stdout (видны в логах Vercel), но не валят приложение.
     """
     try:
         url = database_url()
     except Exception:
         return
     statements = [
-        "INSERT INTO storage.buckets (id, name, public) VALUES ('channeldesk-assets','channeldesk-assets',true) "
-        "ON CONFLICT (id) DO NOTHING",
+        # Создать публичный bucket (id = name = 'channeldesk-assets', лимит 50 МБ)
+        "INSERT INTO storage.buckets (id, name, public, file_size_limit) "
+        "VALUES ('channeldesk-assets','channeldesk-assets',true,52428800) "
+        "ON CONFLICT (id) DO UPDATE SET public=true",
         "ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY",
+        # Аноним может ЗАГРУЖАТЬ файлы в этот bucket (прямая загрузка из браузера)
         """DO $$
         BEGIN
           IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
@@ -77,14 +79,14 @@ def ensure_bucket() -> None:
           END IF;
         END $$;""",
     ]
-    try:
-        with psycopg.connect(url) as conn:
-            with conn.cursor() as cur:
-                for statement in statements:
+    for statement in statements:
+        try:
+            with psycopg.connect(url) as conn:
+                with conn.cursor() as cur:
                     cur.execute(statement)
-            conn.commit()
-    except Exception:
-        pass  # не критично при старте; конкретный upload покажет точную причину
+                conn.commit()
+        except Exception as exc:  # noqa: BLE001
+            print(f'ensure_bucket statement failed: {statement[:60]}... -> {exc}', flush=True)
 
 
 @router.post('/workspaces/{workspace_id}/assets/upload-url', status_code=201)
