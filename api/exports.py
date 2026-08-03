@@ -143,6 +143,10 @@ def list_exports(workspace_id: int, user: dict = Depends(current_user)):
         cur.execute("""SELECT id,kind,format,status,error_text,created_at,completed_at
         FROM cd_exports WHERE workspace_id=%s ORDER BY created_at DESC LIMIT 10""", (workspace_id,))
         return cur.fetchall()
+
+
+@router.post('/workspaces/{workspace_id}/exports', status_code=201)
+def create_export_job(workspace_id: int, payload: ExportRequest, user: dict = Depends(current_user)):
     """Создаёт задание на экспорт: файл сгенерирует и отправит бот прямо в Telegram."""
     member = membership(user['id'], workspace_id)
     action = {'posts': 'post.view', 'bookings': 'booking.view', 'finance': 'finance.view'}.get(payload.kind)
