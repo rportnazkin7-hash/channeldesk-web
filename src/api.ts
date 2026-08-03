@@ -22,6 +22,20 @@ export type Button={text:string;url:string}
 export type Comment={id:number;text:string;created_at:string;username:string|null;first_name:string|null;last_name:string|null}
 export type Version={id:number;title:string;text:string;created_by:number|null;created_at:string}
 export type Template={id:number;name:string;title:string;text:string}
+export type Asset={id:number;file_name:string;file_type:string;file_url:string;size_bytes:number|null}
+async function upload<T>(path:string,form:FormData):Promise<T>{
+ const h=new Headers();const data=window.Telegram?.WebApp?.initData;if(data)h.set('X-Telegram-Init-Data',data)
+ const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),60000)
+ try{
+  const r=await fetch(path,{method:'POST',body:form,headers:h,signal:ctrl.signal})
+  if(!r.ok){let m=`Ошибка ${r.status}`;try{const j=await r.json();m=j.detail||m}catch{}throw new Error(m)}
+  return r.json()
+ }catch(e){
+  if(e instanceof DOMException&&e.name==='AbortError')throw new Error('Загрузка файла не завершилась за 60 секунд')
+  if(e instanceof TypeError)throw new Error('Нет соединения с сервером')
+  throw e
+ }finally{clearTimeout(timer)}
+}
 export const api={
  workspaces:()=>req<Workspace[]>('/api/workspaces'),
  createWorkspace:(name:string)=>req<Workspace>('/api/workspaces',{method:'POST',body:JSON.stringify({name})}),
@@ -47,4 +61,7 @@ export const api={
  templates:(wid:number)=>req<Template[]>(`/api/workspaces/${wid}/templates`),
  createTemplate:(wid:number,p:{name:string;title:string;text:string})=>req<Template>(`/api/workspaces/${wid}/templates`,{method:'POST',body:JSON.stringify(p)}),
  deleteTemplate:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/templates/${id}`,{method:'DELETE'}),
+ assets:(wid:number,postId?:number)=>req<Asset[]>(`/api/workspaces/${wid}/assets${postId!=null?`?post_id=${postId}`:''}`),
+ uploadAsset:(wid:number,file:File,postId?:number|null)=>{const fd=new FormData();fd.append('file',file);if(postId!=null)fd.append('post_id',String(postId));return upload<Asset>(`/api/workspaces/${wid}/assets`,fd)},
+ deleteAsset:(id:number)=>req<void>(`/api/assets/${id}`,{method:'DELETE'}),
 }

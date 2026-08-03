@@ -1,8 +1,8 @@
 import { useEffect,useState } from 'react'
-import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus } from 'lucide-react'
-import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button } from './api'
+import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X } from 'lucide-react'
+import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset } from './api'
 
-const APP_VERSION = 'v0.8.0'
+const APP_VERSION = 'v0.9.0'
 type Tab = 'overview'|'calendar'|'create'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
@@ -32,8 +32,10 @@ export default function App(){
  const [tab,setTab]=useState<Tab>('overview')
  const [spaces,setSpaces]=useState<Workspace[]>([]),[active,setActive]=useState<Workspace|null>(null),[pending,setPending]=useState<Pending[]>([]),[channels,setChannels]=useState<Channel[]>([]),[members,setMembers]=useState<Member[]>([]),[invite,setInvite]=useState<Invite|null>(null),[copied,setCopied]=useState(false),[joined,setJoined]=useState<{workspace_name:string;role:string}|null>(null),[name,setName]=useState('Моё агентство'),[error,setError]=useState(''),[loading,setLoading]=useState(true)
  const [posts,setPosts]=useState<Post[]>([]),[newTitle,setNewTitle]=useState(''),[newText,setNewText]=useState(''),[draftChannel,setDraftChannel]=useState<number|null>(null),[busy,setBusy]=useState(false)
+ const [draftBtns,setDraftBtns]=useState<Button[]>([]),[draftBtnText,setDraftBtnText]=useState(''),[draftBtnUrl,setDraftBtnUrl]=useState(''),[draftFiles,setDraftFiles]=useState<File[]>([])
  const [calYear,setCalYear]=useState(new Date().getFullYear()),[calMonth,setCalMonth]=useState(new Date().getMonth()),[selectedDay,setSelectedDay]=useState<Date|null>(null)
  const [openPost,setOpenPost]=useState<number|null>(null),[comments,setComments]=useState<Record<number,Comment[]>>({}),[versions,setVersions]=useState<Record<number,Version[]>>({}),[commentText,setCommentText]=useState('')
+ const [assetsByPost,setAssetsByPost]=useState<Record<number,Asset[]>>({})
  const [templates,setTemplates]=useState<Template[]>([]),[newTplName,setNewTplName]=useState(''),[btnText,setBtnText]=useState(''),[btnUrl,setBtnUrl]=useState('')
  const hasInitData=!!(window.Telegram?.WebApp?.initData)
 
@@ -44,9 +46,13 @@ export default function App(){
  async function makeInvite(){buzz();if(!active)return;setError('');try{const iv=await api.createInvite(active.id,'editor');setInvite(iv);setCopied(false)}catch(e){setError(e instanceof Error?e.message:'Ошибка создания приглашения')}}
  async function copyInvite(){buzz();if(!invite)return;try{await navigator.clipboard.writeText(invite.token);setCopied(true)}catch{setCopied(false)}}
  function goSection(id:string){buzz();setTab('overview');setTimeout(()=>{document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'})},80)}
- async function createDraft(){buzz();if(!active)return;setBusy(true);setError('');try{await api.createPost(active.id,{title:newTitle,text:newText,channel_id:draftChannel});setNewTitle('');setNewText('');setDraftChannel(null);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания черновика')}finally{setBusy(false)}}
+ async function createDraft(){buzz();if(!active)return;setBusy(true);setError('');try{const post=await api.createPost(active.id,{title:newTitle,text:newText,channel_id:draftChannel,buttons:draftBtns.length?[draftBtns]:[]});for(const f of draftFiles){await api.uploadAsset(active.id,f,post.id)}setNewTitle('');setNewText('');setDraftChannel(null);setDraftBtns([]);setDraftFiles([]);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания черновика')}finally{setBusy(false)}}
+ function addDraftBtn(){buzz();const t=draftBtnText.trim(),u=draftBtnUrl.trim();if(!t||!u)return;setDraftBtns([...draftBtns,{text:t,url:u}]);setDraftBtnText('');setDraftBtnUrl('')}
+ function pickFiles(list:FileList|null){if(!list)return;setDraftFiles([...draftFiles,...Array.from(list)].slice(0,10))}
  async function actPost(id:number,kind:'submit'|'approve'|'changes'|'schedule'|'now'|'cancel'){buzz();if(!active)return;setBusy(true);setError('');try{const w=active.id;if(kind==='submit')await api.submitPost(w,id);if(kind==='approve')await api.approvePost(w,id);if(kind==='changes')await api.requestChanges(w,id);if(kind==='schedule')await api.schedulePost(w,id,new Date(Date.now()+3600000).toISOString());if(kind==='now')await api.publishNow(w,id);if(kind==='cancel')await api.cancelPost(w,id);await load();if(kind==='now')setTimeout(()=>{load()},5000)}catch(e){setError(e instanceof Error?e.message:'Ошибка операции')}finally{setBusy(false)}}
- async function openDetails(id:number){buzz();if(!active)return;const w=active.id;setOpenPost(openPost===id?null:id);if(openPost!==id){try{const [cm,vs]=await Promise.all([api.comments(w,id),api.versions(w,id)]);setComments(prev=>({...prev,[id]:cm}));setVersions(prev=>({...prev,[id]:vs}))}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки деталей')}}}
+ async function openDetails(id:number){buzz();if(!active)return;const w=active.id;setOpenPost(openPost===id?null:id);if(openPost!==id){try{const [cm,vs,as]=await Promise.all([api.comments(w,id),api.versions(w,id),api.assets(w,id)]);setComments(prev=>({...prev,[id]:cm}));setVersions(prev=>({...prev,[id]:vs}));setAssetsByPost(prev=>({...prev,[id]:as}))}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки деталей')}}}
+ async function uploadToPost(id:number,files:FileList|null){buzz();if(!active||!files||!files.length)return;const w=active.id;setBusy(true);setError('');try{for(const f of Array.from(files).slice(0,10)){await api.uploadAsset(w,f,id)}const as=await api.assets(w,id);setAssetsByPost(prev=>({...prev,[id]:as}))}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки вложения')}finally{setBusy(false)}}
+ async function delAsset(postId:number,assetId:number){buzz();if(!active)return;try{await api.deleteAsset(assetId);const as=await api.assets(active.id,postId);setAssetsByPost(prev=>({...prev,[postId]:as}))}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления вложения')}}
  async function addCommentTo(id:number){buzz();if(!active||!commentText.trim())return;const w=active.id;try{await api.addComment(w,id,commentText.trim());setCommentText('');const cm=await api.comments(w,id);setComments(prev=>({...prev,[id]:cm}))}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления комментария')}}
  async function addButtonTo(id:number){buzz();if(!active||!btnText.trim()||!btnUrl.trim())return;const w=active.id;try{const post=posts.find(p=>p.id===id);const cur=post?.buttons||[];const next=[...cur,[{text:btnText.trim(),url:btnUrl.trim()}]];await api.updatePost(w,id,{buttons:next});setBtnText('');setBtnUrl('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления кнопки')}}
  async function useTemplate(t:Template){buzz();setNewTitle(t.title);setNewText(t.text);setTab('calendar');setTimeout(()=>{document.getElementById('draft-form')?.scrollIntoView({behavior:'smooth'})},80)}
@@ -95,6 +101,13 @@ export default function App(){
      </div>
     </div>}
     <div style={{marginBottom:12}}>
+     <strong style={{fontSize:13,display:'flex',alignItems:'center',gap:6}}><Paperclip size={14}/> Вложения ({(assetsByPost[p.id]||[]).length})</strong>
+     {(assetsByPost[p.id]||[]).length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:8,marginTop:8}}>
+      {(assetsByPost[p.id]||[]).map(a=>a.file_type.startsWith('image/')?<div key={a.id} style={{position:'relative'}}><img src={a.file_url} alt={a.file_name} style={{width:64,height:64,borderRadius:10,objectFit:'cover',border:'1px solid #2c3455'}}/>{(p.status==='draft'||p.status==='in_progress'||p.status==='idea')&&<button onClick={()=>delAsset(p.id,a.id)} style={{position:'absolute',top:-6,right:-6,background:'#2a1414',border:'1px solid #4a2c2c',color:'#ff9b9b',borderRadius:'50%',width:20,height:20,display:'grid',placeItems:'center',padding:0}}><X size={11}/></button>}</div>:<div key={a.id} style={{display:'flex',alignItems:'center',gap:6,border:'1px solid #2c3455',borderRadius:10,padding:'6px 10px',background:'#1a2130',fontSize:12}}>📎 <a href={a.file_url} target="_blank" rel="noreferrer" style={{color:'#8cb3ff',textDecoration:'none'}}>{a.file_name.length>20?a.file_name.slice(0,20)+'…':a.file_name}</a>{(p.status==='draft'||p.status==='in_progress'||p.status==='idea')&&<button onClick={()=>delAsset(p.id,a.id)} style={{background:'none',border:0,color:'#ff9b9b',padding:0,marginLeft:4}}><X size={12}/></button>}</div>)}
+     </div>}
+     {(p.status==='draft'||p.status==='in_progress'||p.status==='idea')&&<label className="file-btn" style={{marginTop:8}}><Paperclip size={14}/> Добавить файл<input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" style={{display:'none'}} onChange={e=>{uploadToPost(p.id,e.target.files);e.target.value=''}}/></label>}
+    </div>
+    <div style={{marginBottom:12}}>
      <strong style={{fontSize:13,display:'flex',alignItems:'center',gap:6}}><MessageSquare size={14}/> Комментарии</strong>
      <div style={{display:'flex',gap:8,marginTop:8}}>
       <input placeholder="Комментарий…" value={commentText} onChange={e=>setCommentText(e.target.value)} style={{flex:1,padding:10,borderRadius:10,border:'1px solid #445',background:'#111722',color:'white',fontSize:13}}/>
@@ -139,8 +152,22 @@ export default function App(){
        <option value="">— без канала —</option>
        {channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}
       </select>
-      <button onClick={createDraft} disabled={busy||!newTitle.trim()}><CirclePlus size={18}/> Черновик</button>
      </div>
+     <div style={{margin:'10px 0'}}>
+      <strong style={{fontSize:13}}>Кнопки (до 8)</strong>
+      <div style={{display:'flex',gap:8,marginTop:8}}>
+       <input placeholder="Текст кнопки" value={draftBtnText} onChange={e=>setDraftBtnText(e.target.value)} style={{flex:1,padding:11,borderRadius:10,border:'1px solid #445',background:'#111722',color:'white',fontSize:13}}/>
+       <input placeholder="https://…" value={draftBtnUrl} onChange={e=>setDraftBtnUrl(e.target.value)} style={{flex:1.5,padding:11,borderRadius:10,border:'1px solid #445',background:'#111722',color:'white',fontSize:13}}/>
+       <button onClick={addDraftBtn} disabled={!draftBtnText.trim()||!draftBtnUrl.trim()}><Plus size={15}/></button>
+      </div>
+      {draftBtns.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:8}}>{draftBtns.map((b,i)=><span key={i} className="btn-chip">🔗 {b.text} <button onClick={()=>{buzz();setDraftBtns(draftBtns.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'#ff9b9b',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
+     </div>
+     <div style={{margin:'10px 0'}}>
+      <strong style={{fontSize:13}}>Вложения (фото, видео, документы)</strong>
+      <label className="file-btn"><Paperclip size={15}/> Выбрать файлы<input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" style={{display:'none'}} onChange={e=>pickFiles(e.target.files)}/></label>
+      {draftFiles.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:8}}>{draftFiles.map((f,i)=><span key={i} className="btn-chip">📎 {f.name.length>22?f.name.slice(0,22)+'…':f.name} <button onClick={()=>{buzz();setDraftFiles(draftFiles.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'#ff9b9b',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
+     </div>
+     <button onClick={createDraft} disabled={busy||!newTitle.trim()} style={{width:'100%'}}><CirclePlus size={18}/> Создать черновик {draftFiles.length?`(${draftFiles.length} вл.)`:''}</button>
      {templates.length>0&&<div style={{marginTop:8}}><span style={{color:'#8d96a8',fontSize:12}}>Шаблоны: </span>{templates.map(t=><button key={t.id} onClick={()=>useTemplate(t)} disabled={busy} className="chip-btn">{t.name}</button>)}</div>}
     </section>
 
