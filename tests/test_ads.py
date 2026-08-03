@@ -150,3 +150,30 @@ def test_viewer_cannot_view_finance(monkeypatch):
     monkeypatch.setattr('api.ads.connect', lambda: conn)
     r = client.get('/api/workspaces/3/finance/summary', headers=auth_headers())
     assert r.status_code == 403
+
+
+def test_mark_paid_confirms_future_booking(monkeypatch):
+    """Оплата будущей брони переводит её в confirmed."""
+    from datetime import datetime, timedelta, timezone
+    future = dict(BOOKING_ROW, status='requested', payment_status='unpaid',
+                  publish_at=datetime.now(timezone.utc) + timedelta(days=5))
+    paid = dict(future, status='confirmed', payment_status='paid')
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, future, paid])
+    monkeypatch.setattr('api.ads.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/bookings/5/pay', json={'payment_status': 'paid'}, headers=auth_headers())
+    assert r.status_code == 200
+    assert r.json()['status'] == 'confirmed'
+    assert r.json()['payment_status'] == 'paid'
+
+
+def test_mark_paid_activates_started_booking(monkeypatch):
+    """Оплата брони, чья дата уже наступила, делает её активной."""
+    from datetime import datetime, timedelta, timezone
+    started = dict(BOOKING_ROW, status='requested', payment_status='unpaid',
+                   publish_at=datetime.now(timezone.utc) - timedelta(days=1))
+    paid = dict(started, status='active', payment_status='paid')
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, started, paid])
+    monkeypatch.setattr('api.ads.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/bookings/5/pay', json={'payment_status': 'paid'}, headers=auth_headers())
+    assert r.status_code == 200
+    assert r.json()['status'] == 'active'

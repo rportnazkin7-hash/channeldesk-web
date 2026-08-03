@@ -2,12 +2,12 @@ import { useCallback,useEffect,useState } from 'react'
 import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download } from 'lucide-react'
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit,type Task } from './api'
 
-const APP_VERSION = 'v0.18.2'
+const APP_VERSION = 'v0.19.0'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
 const MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
-const BOOKING_STATUS_LABEL:Record<string,string>={requested:'Заявка',confirmed:'Подтверждено',in_progress:'Идёт',done:'Выполнено',cancelled:'Отменено'}
+const BOOKING_STATUS_LABEL:Record<string,string>={requested:'Заявка',confirmed:'Подтверждено',active:'Активно',done:'Выполнено',cancelled:'Отменено',overdue:'Просрочено'}
 const PAYMENT_LABEL:Record<string,string>={unpaid:'Не оплачено',partially_paid:'Частично',paid:'Оплачено'}
 const FORMAT_LABEL:Record<string,string>={post:'Пост',mention:'Упоминание',repost:'Репост',other:'Другое'}
 
@@ -50,6 +50,7 @@ export default function App(){
  const [fabOpen,setFabOpen]=useState(false)
  const [showCompose,setShowCompose]=useState(false)
  const [showBookingForm,setShowBookingForm]=useState(false)
+ const [bookingTab,setBookingTab]=useState<'future'|'active'|'history'>('future')
  const [showAdvForm,setShowAdvForm]=useState(false)
  const [tasks,setTasks]=useState<Task[]>([])
  const [showTasks,setShowTasks]=useState(false)
@@ -101,6 +102,29 @@ export default function App(){
  const calCells=monthGrid(calYear,calMonth)
  const dayPosts=selectedDay?posts.filter(p=>postDayKey(p)===dayKey(selectedDay)):posts
 
+ const futureBookings=bookings.filter(b=>['requested','confirmed'].includes(b.status))
+ const activeBookings=bookings.filter(b=>b.status==='active')
+ const historyBookings=bookings.filter(b=>['done','cancelled','overdue'].includes(b.status))
+ function renderBookingCard(b:Booking){
+  return <article key={b.id} style={{padding:'12px 0',borderBottom:'1px solid var(--border)'}}>
+   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
+    <strong style={{fontSize:14}}>{b.advertiser_name||`#${b.advertiser_id}`}</strong>
+    <span className={"status status-"+b.status}>{BOOKING_STATUS_LABEL[b.status]||b.status}</span>
+   </div>
+   <p style={{color:'var(--muted)',fontSize:12,margin:'6px 0 0'}}>
+    {FORMAT_LABEL[b.format]||b.format} · {b.cost.toLocaleString('ru-RU')} {b.currency}
+    {b.channel_title?` · ${b.channel_title}`:''}
+   </p>
+   {(b.publish_at||b.delete_at)&&<p style={{color:'var(--text-2)',fontSize:12,margin:'5px 0 0'}}>
+    {b.publish_at?`📅 с ${fmtDate(b.publish_at)}`:''}{b.delete_at?` по ${fmtDate(b.delete_at)}`:''}
+   </p>}
+   {!b.erid_required?<span className="no-erid-badge">без ERID</span>:b.erid?<p style={{color:'var(--muted-2)',fontSize:11,margin:'4px 0 0'}}>{b.erid}</p>:<span className="no-erid-badge warn">ERID не указан</span>}
+   <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10,alignItems:'center'}}>
+    <span className={"status "+(b.payment_status==='paid'?'status-published':b.payment_status==='partially_paid'?'status-review':'status-cancelled')}>{PAYMENT_LABEL[b.payment_status]||b.payment_status}</span>
+    {b.payment_status!=='paid'&&!['done','cancelled'].includes(b.status)&&<button onClick={()=>payBooking(b.id)} disabled={busy}>✓ Оплачено</button>}
+   </div>
+  </article>
+ }
  function renderPostCard(p:Post){
   const open=openPost===p.id
   return <article key={p.id} style={{padding:'14px 0',borderBottom:'1px solid var(--border)'}}>
@@ -217,40 +241,36 @@ export default function App(){
   </>}
 
   {!showCompose&&!showTasks&&!showMediaKits&&!showBookingForm&&!showAdvForm&&tab==='ads'&&<>
-   {!active?<section className="panel"><div className="empty"><div className="empty-icon"><Megaphone/></div><h3>Создайте рабочее пространство</h3><p>Рекламный раздел появится после создания пространства.</p></div></section>:<>
+   {!active?<section className="panel"><div className="empty"><div className="empty-icon"><Megaphone/></div><h3>Создайте рабочее пространство</h3><p>Раздел клиентов появится после создания пространства.</p></div></section>:<>
     <section className="panel"><div className="panel-title"><h2>Клиенты</h2><Users size={20}/></div>
-     <p style={{color:'var(--muted)',fontSize:12,margin:'4px 0 0'}}>Рекламодатели и активные размещения. Создание — через «+» внизу.</p>
+     <p style={{color:'var(--muted)',fontSize:12,margin:'4px 0 0'}}>Рекламодатели и размещения. Создание — через «+» внизу.</p>
     </section>
 
     <section className="panel" style={{marginTop:14}}>
      <div className="panel-title"><h2>Рекламодатели</h2><Users size={20}/></div>
      {advertisers.length===0?<div className="empty"><p>Рекламодателей пока нет. Добавьте через кнопку «+» внизу.</p></div>:advertisers.map(a=><div key={a.id} style={{padding:'12px 0',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
       <div><strong style={{fontSize:14}}>{a.name}</strong>{a.notes&&<div style={{color:'var(--muted)',fontSize:12}}>{a.notes}</div>}</div>
-      <div style={{display:'flex',gap:6,alignItems:'center'}}>
-       <span className="no-erid-badge" style={{marginTop:0}}>{bookings.filter(b=>b.advertiser_id===a.id).length} броней</span>
-       <button onClick={()=>delAdvertiser(a.id)} disabled={busy} className="icon-btn danger" title="Удалить"><Trash2 size={14}/></button>
-      </div>
+      <span className="no-erid-badge" style={{marginTop:0}}>{bookings.filter(b=>b.advertiser_id===a.id).length} броней</span>
      </div>)}
     </section>
 
     <section className="panel" style={{marginTop:14}}>
-     <div className="panel-title"><h2>Активные брони</h2><Wallet size={20}/></div>
-     {bookings.filter(b=>!['done','cancelled'].includes(b.status)).length===0?<div className="empty"><p>Активных броней нет. Создайте через кнопку «+» внизу.</p></div>:bookings.filter(b=>!['done','cancelled'].includes(b.status)).map(b=><article key={b.id} style={{padding:'13px 0',borderBottom:'1px solid var(--border)'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
-       <strong style={{fontSize:14}}>{b.advertiser_name||`#${b.advertiser_id}`}</strong>
-       <span className={"status status-"+b.status}>{BOOKING_STATUS_LABEL[b.status]||b.status}</span>
-      </div>
-      <p style={{color:'var(--muted)',fontSize:12,margin:'6px 0 0'}}>
-       {FORMAT_LABEL[b.format]||b.format} · {b.cost.toLocaleString('ru-RU')} {b.currency}
-       {b.channel_title?` · ${b.channel_title}`:''}
-       {b.publish_at?` · ${fmtDate(b.publish_at)}`:''}
-      </p>
-      {!b.erid_required?<span className="no-erid-badge">без ERID</span>:b.erid?<p style={{color:'var(--muted-2)',fontSize:11,margin:'4px 0 0'}}>{b.erid}</p>:<span className="no-erid-badge warn">ERID не указан</span>}
-      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10,alignItems:'center'}}>
-       <span className={"status "+(b.payment_status==='paid'?'status-published':b.payment_status==='partially_paid'?'status-review':'status-cancelled')}>{PAYMENT_LABEL[b.payment_status]||b.payment_status}</span>
-       {b.payment_status!=='paid'&&<button onClick={()=>payBooking(b.id)} disabled={busy}>✓ Оплачено</button>}
-      </div>
-     </article>)}
+     <div className="panel-title"><h2>Размещения</h2><Wallet size={20}/></div>
+     <div className="seg" style={{marginTop:10}}>
+      {(['future','active','history'] as const).map(t=><button key={t} className={bookingTab===t?'seg-on':''} onClick={()=>{buzz();setBookingTab(t)}}>{t==='future'?'Будущие':t==='active'?'Активные':'История'}</button>)}
+     </div>
+     {bookingTab==='future'&&<>
+      <div style={{fontSize:11,color:'var(--muted-2)',margin:'10px 2px 2px'}}>Заявки и подтверждённые брони, которые ещё не начались</div>
+      {futureBookings.length===0?<div className="empty"><p>Будущих броней нет. Создайте через «+».</p></div>:futureBookings.map(renderBookingCard)}
+     </>}
+     {bookingTab==='active'&&<>
+      <div style={{fontSize:11,color:'var(--muted-2)',margin:'10px 2px 2px'}}>Идут сейчас: с даты начала до даты окончания</div>
+      {activeBookings.length===0?<div className="empty"><p>Активных размещений нет.</p></div>:activeBookings.map(renderBookingCard)}
+     </>}
+     {bookingTab==='history'&&<>
+      <div style={{fontSize:11,color:'var(--muted-2)',margin:'10px 2px 2px'}}>Завершённые, отменённые и просроченные</div>
+      {historyBookings.length===0?<div className="empty"><p>История пуста.</p></div>:historyBookings.map(renderBookingCard)}
+     </>}
     </section>
    </>}
   </>}

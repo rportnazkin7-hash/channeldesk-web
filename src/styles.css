@@ -92,6 +92,10 @@ select.field option{background:var(--panel);color:var(--text)}
 .status-publishing{color:var(--accent-2);background:var(--accent-soft)}
 .status-failed{color:var(--danger);background:var(--danger-bg)}
 .status-cancelled{color:var(--muted-2);background:var(--chip-bg)}
+.status-active{color:var(--accent-2);background:var(--accent-soft);border:1px solid var(--accent-border)}
+.status-overdue{color:var(--danger);background:var(--danger-bg);border:1px solid var(--danger-border)}
+.status-requested{color:var(--warn);background:var(--warn-bg)}
+.status-confirmed{color:var(--accent-2);background:var(--accent-soft)}
 .no-erid-badge{display:inline-block;font-size:10px;color:var(--accent-2);border:1px solid var(--accent-border);background:var(--accent-soft);border-radius:6px;padding:2px 7px;margin-top:3px;font-weight:600}
 .no-erid-badge.warn{color:var(--warn);border-color:var(--warn-border);background:var(--warn-bg)}
 /* ---------- Календарь ---------- */

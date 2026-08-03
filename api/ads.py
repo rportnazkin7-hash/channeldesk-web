@@ -11,7 +11,7 @@ from api.workspaces import audit
 
 router = APIRouter(prefix='/api', tags=['ads'])
 
-BOOKING_STATUSES = {'requested', 'confirmed', 'in_progress', 'done', 'cancelled'}
+BOOKING_STATUSES = {'requested', 'confirmed', 'active', 'done', 'cancelled', 'overdue'}
 PAYMENT_STATUSES = {'unpaid', 'partially_paid', 'paid'}
 
 
@@ -256,8 +256,17 @@ def mark_paid(workspace_id: int, booking_id: int, payload: BookingUpdate, user: 
             raise HTTPException(404, 'Бронь не найдена')
         if payload.payment_status not in PAYMENT_STATUSES:
             raise HTTPException(422, 'Неизвестный статус оплаты')
-        cur.execute("UPDATE cd_ad_bookings SET payment_status=%s,updated_at=now() WHERE id=%s RETURNING *",
-                    (payload.payment_status, booking_id))
+        # При оплате бронь подтверждается; если дата начала уже наступила — сразу активна.
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        publish_at = booking.get('publish_at')
+        if payload.payment_status in ('paid', 'partially_paid'):
+            new_status = 'active' if publish_at and publish_at <= now else 'confirmed'
+            cur.execute("""UPDATE cd_ad_bookings SET payment_status=%s,status=%s,updated_at=now()
+            WHERE id=%s RETURNING *""", (payload.payment_status, new_status, booking_id))
+        else:
+            cur.execute("UPDATE cd_ad_bookings SET payment_status=%s,updated_at=now() WHERE id=%s RETURNING *",
+                        (payload.payment_status, booking_id))
         updated = cur.fetchone()
         # создаём транзакцию дохода только если оплата (не возврат)
         if payload.payment_status in ('paid', 'partially_paid'):
