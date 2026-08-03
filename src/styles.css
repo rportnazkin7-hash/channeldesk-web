@@ -193,8 +193,9 @@ nav button.active svg{filter:drop-shadow(0 0 6px #10b98155)}
 /* ---------- Аналитика каналов ---------- */
 .analytics-panel{margin-top:4px}
 .analytics-note{color:var(--muted);font-size:11px;line-height:1.45;margin:7px 0 0}
-.analytics-filters{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:6px;margin-top:8px}
-.analytics-filters .field{min-width:0;padding:8px 9px}
+.analytics-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:8px}
+.analytics-filters .field{width:100%;min-width:0;max-width:100%;padding:8px 9px;font-variant-numeric:tabular-nums}
+.analytics-filters .field:last-child{grid-column:1 / -1}
 .analytics-cards{grid-template-columns:repeat(4,minmax(0,1fr));margin-top:12px}
 .analytics-cards div{text-align:left;min-width:0}
 .analytics-chart{margin-top:14px;overflow:hidden}
@@ -213,5 +214,6 @@ nav button.active svg{filter:drop-shadow(0 0 6px #10b98155)}
 .analytics-row span:not(.status){color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .analytics-row a{color:var(--accent-2);text-decoration:none}
 .analytics-row .icon-btn{flex:0 0 auto}
-@media(max-width:430px){.analytics-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.analytics-filters{grid-template-columns:1fr 1fr}.analytics-filters .field:last-child{grid-column:1 / -1}.analytics-form-grid{grid-template-columns:1fr}.analytics-chart .trend-column{flex-basis:30px}.analytics-chart .trend-bars{width:26px}.analytics-chart .trend-bars i{width:10px}}
+@media(max-width:560px){.analytics-filters{grid-template-columns:1fr}.analytics-filters .field:last-child{grid-column:auto}}
+@media(max-width:430px){.analytics-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.analytics-form-grid{grid-template-columns:1fr}.analytics-chart .trend-column{flex-basis:30px}.analytics-chart .trend-bars{width:26px}.analytics-chart .trend-bars i{width:10px}}
 @media(min-width:700px){.app{max-width:720px;margin:auto}.stats{grid-template-columns:repeat(4,1fr)}}
