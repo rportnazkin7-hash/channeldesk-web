@@ -37,6 +37,10 @@ MATRIX: dict[str, frozenset[str]] = {
     # Медиакиты (Этап C)
     'media_kit.view': frozenset({'owner','admin','editor','author','designer','ad_manager','analyst','viewer'}),
     'media_kit.manage': frozenset({'owner','admin','ad_manager','designer'}),
+
+    # Задачи (Этап C)
+    'task.view': frozenset({'owner','admin','editor','author','designer','ad_manager','analyst','viewer'}),
+    'task.manage': frozenset({'owner','admin','editor'}),
 }
 
 
