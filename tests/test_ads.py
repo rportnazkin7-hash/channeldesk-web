@@ -76,6 +76,27 @@ def test_create_booking_invalid_advertiser(monkeypatch):
     assert 'Рекламодатель' in r.json()['detail']
 
 
+def test_create_booking_no_erid_required(monkeypatch):
+    booking_no_erid = dict(BOOKING_ROW, erid=None, erid_required=False)
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, {'id': 1}, {'id': 9}, booking_no_erid])
+    monkeypatch.setattr('api.ads.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/bookings',
+                    json={'advertiser_id': 1, 'channel_id': 9, 'cost': 5000, 'erid_required': False},
+                    headers=auth_headers())
+    assert r.status_code == 201
+    assert r.json()['erid_required'] is False
+    assert r.json()['erid'] is None
+
+
+def test_update_booking_erid_required(monkeypatch):
+    updated = dict(BOOKING_ROW, erid_required=False)
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, updated])
+    monkeypatch.setattr('api.ads.connect', lambda: conn)
+    r = client.patch('/api/workspaces/3/bookings/5', json={'erid_required': False}, headers=auth_headers())
+    assert r.status_code == 200
+    assert r.json()['erid_required'] is False
+
+
 def test_list_bookings(monkeypatch):
     conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, [BOOKING_ROW]])
     monkeypatch.setattr('api.ads.connect', lambda: conn)

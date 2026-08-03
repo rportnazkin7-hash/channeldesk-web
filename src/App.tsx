@@ -2,7 +2,7 @@ import { useEffect,useState } from 'react'
 import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X } from 'lucide-react'
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary } from './api'
 
-const APP_VERSION = 'v0.11.0'
+const APP_VERSION = 'v0.11.1'
 type Tab = 'overview'|'calendar'|'create'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
@@ -43,7 +43,7 @@ export default function App(){
  const [templates,setTemplates]=useState<Template[]>([]),[newTplName,setNewTplName]=useState(''),[btnText,setBtnText]=useState(''),[btnUrl,setBtnUrl]=useState('')
  const [advertisers,setAdvertisers]=useState<Advertiser[]>([]),[bookings,setBookings]=useState<Booking[]>([]),[finSummary,setFinSummary]=useState<FinanceSummary|null>(null)
  const [advName,setAdvName]=useState(''),[advContact,setAdvContact]=useState('')
- const [bkAdv,setBkAdv]=useState<number|null>(null),[bkChannel,setBkChannel]=useState<number|null>(null),[bkCost,setBkCost]=useState(''),[bkDate,setBkDate]=useState(''),[bkErid,setBkErid]=useState('')
+ const [bkAdv,setBkAdv]=useState<number|null>(null),[bkChannel,setBkChannel]=useState<number|null>(null),[bkCost,setBkCost]=useState(''),[bkDate,setBkDate]=useState(''),[bkErid,setBkErid]=useState(''),[bkNoErid,setBkNoErid]=useState(false)
  const [finType,setFinType]=useState<'income'|'expense'>('income'),[finAmount,setFinAmount]=useState(''),[finDesc,setFinDesc]=useState('')
  const [adsTab,setAdsTab]=useState<'bookings'|'advertisers'|'finance'>('bookings')
  const hasInitData=!!(window.Telegram?.WebApp?.initData)
@@ -51,7 +51,7 @@ export default function App(){
  async function load(){setLoading(true);setError('');try{const s=await api.workspaces();setSpaces(s);const a=active&&s.some(x=>x.id===active.id)?active:s[0]||null;setActive(a);const [p,c,m,po,t,ad,bk,fs]=await Promise.all([api.pending(),a?api.channels(a.id):Promise.resolve([]),a?api.members(a.id):Promise.resolve([]),a?api.posts(a.id):Promise.resolve([]),a?api.templates(a.id):Promise.resolve([]),a?api.advertisers(a.id):Promise.resolve([]),a?api.bookings(a.id):Promise.resolve([]),a?api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1):Promise.resolve(null)]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFinSummary(fs);setOpenPost(null)}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки')}finally{setLoading(false)}}
  async function addAdvertiser(){buzz();if(!active)return;setError('');try{await api.createAdvertiser(active.id,{name:advName,notes:advContact});setAdvName('');setAdvContact('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления рекламодателя')}}
  async function delAdvertiser(id:number){buzz();if(!active)return;try{await api.deleteAdvertiser(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления рекламодателя')}}
- async function addBooking(){buzz();if(!active)return;setError('');try{await api.createBooking(active.id,{advertiser_id:bkAdv??0,cost:Number(bkCost)||0,channel_id:bkChannel,publish_at:bkDate?new Date(bkDate).toISOString():null,erid:bkErid||null});setBkAdv(null);setBkCost('');setBkDate('');setBkErid('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания брони')}}
+ async function addBooking(){buzz();if(!active)return;setError('');try{await api.createBooking(active.id,{advertiser_id:bkAdv??0,cost:Number(bkCost)||0,channel_id:bkChannel,publish_at:bkDate?new Date(bkDate).toISOString():null,erid:bkNoErid?null:(bkErid||null),erid_required:!bkNoErid});setBkAdv(null);setBkCost('');setBkDate('');setBkErid('');setBkNoErid(false);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания брони')}}
  async function payBooking(id:number){buzz();if(!active)return;try{await api.payBooking(active.id,id,'paid');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка отметки оплаты')}}
  async function delBooking(id:number){buzz();if(!active)return;try{await api.deleteBooking(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления брони')}}
  async function addFinance(){buzz();if(!active)return;setError('');try{await api.createTransaction(active.id,{type:finType,amount:Number(finAmount)||0,category:finType==='income'?'advertising':'other',description:finDesc});setFinAmount('');setFinDesc('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления транзакции')}}
@@ -251,8 +251,14 @@ export default function App(){
       <input className="field" placeholder="Стоимость, ₽" type="number" value={bkCost} onChange={e=>setBkCost(e.target.value)}/>
       <input className="field" placeholder="Дата (ГГГГ-ММ-ДД)" type="date" value={bkDate} onChange={e=>setBkDate(e.target.value)}/>
      </div>
-     <label className="form-label">ERID</label>
-     <input className="field" placeholder="erid: …" value={bkErid} onChange={e=>setBkErid(e.target.value)}/>
+     <label className="form-label" style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}}>
+      <input type="checkbox" checked={bkNoErid} onChange={e=>setBkNoErid(e.target.checked)} style={{width:18,height:18,accentColor:'#8cb3ff'}}/>
+      <span>ERID не требуется (обычный Telegram-канал)</span>
+     </label>
+     {!bkNoErid&&<>
+      <label className="form-label">ERID</label>
+      <input className="field" placeholder="erid: …" value={bkErid} onChange={e=>setBkErid(e.target.value)}/>
+     </>}
      <button className="primary-btn" onClick={addBooking} disabled={!bkAdv}><Megaphone size={17}/> Создать бронь</button>
      <div className="panel-title" style={{marginTop:20}}><h3 className="list-h">Бронирования</h3></div>
      {bookings.length===0?<div className="empty"><p>Броней пока нет.</p></div>:bookings.map(b=><article key={b.id} style={{padding:'13px 0',borderBottom:'1px solid #222936'}}>
@@ -265,7 +271,7 @@ export default function App(){
        {b.channel_title?` · ${b.channel_title}`:''}
        {b.publish_at?` · ${fmtDate(b.publish_at)}`:''}
       </p>
-      {b.erid&&<p style={{color:'#5b6475',fontSize:11,margin:'4px 0 0'}}>{b.erid}</p>}
+      {!b.erid_required?<span className="no-erid-badge">без ERID</span>:b.erid?<p style={{color:'#5b6475',fontSize:11,margin:'4px 0 0'}}>{b.erid}</p>:<span className="no-erid-badge warn">ERID не указан</span>}
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10,alignItems:'center'}}>
        <span className={"status "+(b.payment_status==='paid'?'status-published':b.payment_status==='partially_paid'?'status-review':'status-cancelled')}>{PAYMENT_LABEL[b.payment_status]||b.payment_status}</span>
        {b.payment_status!=='paid'&&<button onClick={()=>payBooking(b.id)} disabled={busy}>✓ Оплачено</button>}

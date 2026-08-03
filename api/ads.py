@@ -40,6 +40,7 @@ class BookingCreate(BaseModel):
     publish_at: datetime | None = None
     delete_at: datetime | None = None
     erid: str | None = None
+    erid_required: bool = True
     requisites: dict = Field(default_factory=dict)
     materials_url: str | None = None
 
@@ -56,6 +57,7 @@ class BookingUpdate(BaseModel):
     publish_at: datetime | None = None
     delete_at: datetime | None = None
     erid: str | None = None
+    erid_required: bool | None = None
     requisites: dict | None = None
     materials_url: str | None = None
     report_url: str | None = None
@@ -185,12 +187,12 @@ def create_booking(workspace_id: int, payload: BookingCreate, user: dict = Depen
     with connect() as conn, conn.cursor() as cur:
         _validate_booking(cur, workspace_id, payload)
         cur.execute("""INSERT INTO cd_ad_bookings(workspace_id,advertiser_id,channel_id,post_id,format,cost,currency,
-        status,payment_status,publish_at,delete_at,erid,requisites,materials_url,created_by)
-        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s) RETURNING *""",
+        status,payment_status,publish_at,delete_at,erid,erid_required,requisites,materials_url,created_by)
+        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s) RETURNING *""",
                     (workspace_id, payload.advertiser_id, payload.channel_id, payload.post_id, payload.format,
                      payload.cost, payload.currency, payload.status, payload.payment_status,
-                     payload.publish_at, payload.delete_at, payload.erid, json.dumps(payload.requisites),
-                     payload.materials_url, user['id']))
+                     payload.publish_at, payload.delete_at, payload.erid, payload.erid_required,
+                     json.dumps(payload.requisites), payload.materials_url, user['id']))
         row = cur.fetchone()
         audit(cur, workspace_id, user['id'], 'booking.created', 'booking', row['id'])
         return row
@@ -212,7 +214,7 @@ def update_booking(workspace_id: int, booking_id: int, payload: BookingUpdate,
         _validate_booking(cur, workspace_id, payload)
         fields, values = [], []
         for key in ('advertiser_id', 'channel_id', 'post_id', 'format', 'cost', 'currency', 'status',
-                    'payment_status', 'publish_at', 'delete_at', 'erid', 'materials_url', 'report_url'):
+                    'payment_status', 'publish_at', 'delete_at', 'erid', 'erid_required', 'materials_url', 'report_url'):
             if key in data:
                 fields.append(f'{key}=%s')
                 values.append(data[key])
