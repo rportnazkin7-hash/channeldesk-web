@@ -1,8 +1,10 @@
 from __future__ import annotations
+import json
 import os
+import urllib.error
+import urllib.request
 import uuid
 from pathlib import Path
-import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from api.auth import current_user
 from api.db import connect
@@ -35,6 +37,42 @@ def storage_path_from_url(file_url: str) -> str | None:
     return None
 
 
+def _storage_post_object(url: str, key: str, bucket: str, path: str, content_type: str, data: bytes) -> None:
+    """Загрузка файла в Supabase Storage. Только байты в памяти — без temp-файлов."""
+    req = urllib.request.Request(
+        f'{url}/storage/v1/object/{bucket}/{path}',
+        data=data,
+        method='POST',
+        headers={'Authorization': f'Bearer {key}',
+                 'Content-Type': content_type,
+                 'Content-Length': str(len(data))},
+    )
+    with urllib.request.urlopen(req, timeout=120):
+        pass
+
+
+def _storage_delete_object(url: str, key: str, bucket: str, path: str) -> None:
+    req = urllib.request.Request(
+        f'{url}/storage/v1/object/{bucket}/{path}',
+        method='DELETE',
+        headers={'Authorization': f'Bearer {key}'},
+    )
+    with urllib.request.urlopen(req, timeout=30):
+        pass
+
+
+def _storage_create_bucket(url: str, key: str) -> None:
+    body = json.dumps({'name': BUCKET, 'public': True}).encode('utf-8')
+    req = urllib.request.Request(
+        f'{url}/storage/v1/bucket',
+        data=body,
+        method='POST',
+        headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
+    )
+    with urllib.request.urlopen(req, timeout=15):
+        pass
+
+
 def ensure_bucket() -> None:
     """Идемпотентно создаёт публичный bucket (пропускает, если env не настроены)."""
     try:
@@ -42,14 +80,9 @@ def ensure_bucket() -> None:
     except HTTPException:
         return
     try:
-        with httpx.Client(timeout=15) as client:
-            client.post(f'{url}/storage/v1/bucket',
-                        headers={'Authorization': f'Bearer {key}'},
-                        json={'name': BUCKET, 'public': True})
-            # 400 «already exists» — допустимо; другие ошибки игнорируем,
-            # т.к. первый upload всё равно покажет точную причину.
+        _storage_create_bucket(url, key)
     except Exception:
-        pass
+        pass  # «already exists» и прочие ошибки не критичны — upload покажет точную причину
 
 
 @router.post('/workspaces/{workspace_id}/assets', status_code=201)
@@ -60,6 +93,7 @@ async def upload_asset(workspace_id: int,
     member = membership(user['id'], workspace_id)
     require_action(member, 'post.edit')
     data = await file.read()
+    await file.close()  # освобождаем spooled-файл сразу, не дожидаясь GC
     if not data:
         raise HTTPException(422, 'Пустой файл')
     if len(data) > MAX_SIZE:
@@ -72,21 +106,19 @@ async def upload_asset(workspace_id: int,
                 raise HTTPException(422, 'Публикация не принадлежит этому рабочему пространству')
     ext = Path(file.filename or 'file').suffix.lower() or ''
     storage_path = f'{workspace_id}/{uuid.uuid4().hex}{ext}'
+    content_type = file.content_type or 'application/octet-stream'
     try:
-        with httpx.Client(timeout=120) as client:
-            resp = client.post(f'{url}/storage/v1/object/{BUCKET}/{storage_path}',
-                               headers={'Authorization': f'Bearer {key}',
-                                        'Content-Type': file.content_type or 'application/octet-stream'},
-                               content=data)
-    except Exception as exc:
-        raise HTTPException(503, f'Ошибка загрузки в хранилище: {exc}')
-    if resp.status_code not in (200, 201):
-        raise HTTPException(502, f'Хранилище вернуло ошибку {resp.status_code}: {resp.text[:200]}')
+        _storage_post_object(url, key, BUCKET, storage_path, content_type, data)
+    except urllib.error.HTTPError as exc:
+        body = exc.read(300).decode('utf-8', 'replace')
+        raise HTTPException(502, f'Хранилище вернуло ошибку {exc.code}: {body}')
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise HTTPException(503, f'Сеть до хранилища недоступна: {exc}')
     file_url = public_file_url(url, storage_path)
     with connect() as conn, conn.cursor() as cur:
         cur.execute("""INSERT INTO cd_content_assets(workspace_id,post_id,file_name,file_type,file_url,size_bytes,uploaded_by)
         VALUES(%s,%s,%s,%s,%s,%s,%s) RETURNING *""",
-                    (workspace_id, post_id, file.filename or 'file', file.content_type or 'application/octet-stream',
+                    (workspace_id, post_id, file.filename or 'file', content_type,
                      file_url, len(data), user['id']))
         row = cur.fetchone()
         if post_id:
@@ -124,9 +156,7 @@ def delete_asset(asset_id: int, user: dict = Depends(current_user)):
         if path:
             try:
                 url, key = storage_config()
-                with httpx.Client(timeout=30) as client:
-                    client.delete(f'{url}/storage/v1/object/{BUCKET}/{path}',
-                                  headers={'Authorization': f'Bearer {key}'})
+                _storage_delete_object(url, key, BUCKET, path)
             except Exception:
                 pass  # удаляем запись, даже если storage недоступен
         cur.execute('DELETE FROM cd_content_assets WHERE id=%s', (asset_id,))
