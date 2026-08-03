@@ -34,6 +34,10 @@ MATRIX: dict[str, frozenset[str]] = {
     'finance.view': frozenset({'owner','admin','analyst','ad_manager'}),
     'finance.manage': frozenset({'owner','admin','ad_manager'}),
 
+    # Аналитика каналов: Bot API даёт только часть данных, остальное вводится вручную.
+    'analytics.view': frozenset({'owner','admin','editor','author','designer','ad_manager','analyst','viewer'}),
+    'analytics.manage': frozenset({'owner','admin','ad_manager','analyst'}),
+
     # Медиакиты (Этап C)
     'media_kit.view': frozenset({'owner','admin','editor','author','designer','ad_manager','analyst','viewer'}),
     'media_kit.manage': frozenset({'owner','admin','ad_manager','designer'}),

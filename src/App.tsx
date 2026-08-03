@@ -1,9 +1,10 @@
 import { useCallback,useEffect,useState } from 'react'
-import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download } from 'lucide-react'
+import { Activity,BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download } from 'lucide-react'
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit,type Task } from './api'
 import Statistics from './Statistics'
+import Analytics from './Analytics'
 
-const APP_VERSION = 'v0.22.0'
+const APP_VERSION = 'v0.23.0'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
@@ -48,6 +49,7 @@ export default function App(){
  const [mediaKits,setMediaKits]=useState<MediaKit[]>([])
  const [showMediaKits,setShowMediaKits]=useState(false)
  const [showStatistics,setShowStatistics]=useState(false)
+ const [showAnalytics,setShowAnalytics]=useState(false)
  const [fabOpen,setFabOpen]=useState(false)
  const [showCompose,setShowCompose]=useState(false)
  const [showBookingForm,setShowBookingForm]=useState(false)
@@ -198,7 +200,7 @@ export default function App(){
    </div>)}
   </section>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='overview'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='overview'&&<>
    {!active&&!loading?<section className="hero"><p>Создайте рабочее пространство агентства.</p><input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',marginBottom:12}}/><button onClick={create}><CirclePlus size={19}/> Создать</button></section>:<>
     <section className="hero"><span className="eyebrow">{active?.role}</span><p style={{marginTop:8}}>{active?.name}</p><div>{spaces.length>1&&<select value={active?.id} onChange={e=>{buzz();setActiveId(Number(e.target.value))}}>{spaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select>}</div></section>
     {pending.length>0&&<section className="panel" style={{marginTop:16}}><div className="panel-title"><h2>Обнаруженные каналы</h2><Radio size={20}/></div>{pending.map(p=><article key={p.id} style={{padding:'14px 0',borderBottom:'1px solid var(--border)'}}><strong>{p.title}</strong><p style={{color:'var(--muted)',fontSize:12}}>{p.bot_permissions.can_post_messages?'Публикация разрешена':'Нет права публикации'}</p><button onClick={()=>connect(p.id)} disabled={!p.bot_permissions.can_post_messages}>Подключить</button></article>)}</section>}
@@ -219,7 +221,7 @@ export default function App(){
    </>}
   </>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='calendar'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='calendar'&&<>
    {!active?<section className="panel"><div className="empty"><div className="empty-icon"><CalendarDays/></div><h3>Создайте рабочее пространство</h3><p>Календарь публикаций появится после создания пространства и подключения канала.</p></div></section>:<>
     <section className="panel">
      <div className="cal-head">
@@ -244,7 +246,7 @@ export default function App(){
    </>}
   </>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='ads'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='ads'&&<>
    {!active?<section className="panel"><div className="empty"><div className="empty-icon"><Megaphone/></div><h3>Создайте рабочее пространство</h3><p>Раздел клиентов появится после создания пространства.</p></div></section>:<>
     <section className="panel"><div className="panel-title"><h2>Клиенты</h2><Users size={20}/></div>
      <p style={{color:'var(--muted)',fontSize:12,margin:'4px 0 0'}}>Рекламодатели и размещения. Создание — через «+» внизу.</p>
@@ -439,14 +441,16 @@ export default function App(){
    </div>
   </section>}
 
+  {showAnalytics&&active&&<Analytics workspaceId={active.id} channels={channels} onBack={()=>{buzz();setShowAnalytics(false)}} onError={setError}/>}
   {showStatistics&&active&&<Statistics workspaceId={active.id} onBack={()=>{buzz();setShowStatistics(false)}} onExport={(format,year,month)=>sendExport('finance',format,{year,month})} onError={setError}/>}
 
-  {!showStatistics&&!showMediaKits&&!showTasks&&!showCompose&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='more'&&<section className="panel"><div className="panel-title"><h2>Ещё</h2><MoreHorizontal size={20}/></div>
+  {!showStatistics&&!showAnalytics&&!showMediaKits&&!showTasks&&!showCompose&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='more'&&<section className="panel"><div className="panel-title"><h2>Ещё</h2><MoreHorizontal size={20}/></div>
    {[
     {icon:Megaphone,label:'Каналы',desc:'Управление подключёнными каналами',action:()=>goSection('channels-section')},
     {icon:Users,label:'Команда',desc:'Участники и приглашения',action:()=>goSection('team-section')},
     {icon:CheckCircle2,label:'Задачи',desc:'Задачи и напоминания',action:()=>{buzz();setShowTasks(true)}},
     {icon:LineChart,label:'Статистика',desc:'Доходы, расходы, прибыль и отчёты',action:()=>{buzz();if(active)setShowStatistics(true);else setError('Сначала создайте рабочее пространство')}},
+    {icon:Activity,label:'Аналитика каналов',desc:'Охват, просмотры, ссылки и метрики',action:()=>{buzz();if(active)setShowAnalytics(true);else setError('Сначала создайте рабочее пространство')}},
     {icon:ImageIcon,label:'Медиакиты',desc:'Презентация для рекламодателей',action:()=>{buzz();setShowMediaKits(true)}},
     {icon:Settings,label:'Настройки',desc:'Пространство и уведомления',action:()=>{buzz();setShowSettings(true)}},
    ].map(item=>{
