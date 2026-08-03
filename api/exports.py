@@ -4,14 +4,23 @@ import io
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from api.auth import current_user
 from api.db import connect
 from api.permissions import membership
 from api.rbac import require_action
 
 router = APIRouter(prefix='/api', tags=['exports'])
+
+EXPORT_KINDS = {'posts', 'bookings', 'finance'}
+EXPORT_FORMATS = {'csv', 'xlsx', 'pdf'}
+
+
+class ExportRequest(BaseModel):
+    kind: str
+    format: str = 'csv'
 
 
 def _fmt(dt) -> str:
@@ -124,6 +133,25 @@ def posts_pdf(posts: list[dict]) -> StreamingResponse:
 
 
 # --- Маршруты экспорта ---
+
+@router.post('/workspaces/{workspace_id}/exports', status_code=201)
+def create_export_job(workspace_id: int, payload: ExportRequest, user: dict = Depends(current_user)):
+    """Создаёт задание на экспорт: файл сгенерирует и отправит бот прямо в Telegram."""
+    member = membership(user['id'], workspace_id)
+    action = {'posts': 'post.view', 'bookings': 'booking.view', 'finance': 'finance.view'}.get(payload.kind)
+    if action is None:
+        raise HTTPException(422, 'Неизвестный тип экспорта')
+    require_action(member, action)
+    if payload.format not in EXPORT_FORMATS:
+        raise HTTPException(422, 'Неизвестный формат')
+    if payload.kind == 'posts' and payload.format == 'pdf':
+        pass  # PDF доступен для постов
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute("""INSERT INTO cd_exports(workspace_id,user_id,telegram_id,kind,format)
+        VALUES(%s,%s,%s,%s,%s) RETURNING id,kind,format,status""",
+                    (workspace_id, user['id'], user['telegram_id'], payload.kind, payload.format))
+        row = cur.fetchone()
+    return {**row, 'message': 'Файл будет отправлен ботом в Telegram в течение ~30 секунд'}
 
 def _load_posts(workspace_id: int) -> list[dict]:
     with connect() as conn, conn.cursor() as cur:

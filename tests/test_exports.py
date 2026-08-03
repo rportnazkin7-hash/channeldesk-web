@@ -93,3 +93,35 @@ def test_export_finance_csv(monkeypatch):
     r = client.get('/api/workspaces/3/export/finance?format=csv', headers=auth_headers())
     assert r.status_code == 200
     assert 'Доход' in r.content.decode('utf-8-sig')
+
+
+def test_create_export_job(monkeypatch):
+    job = {'id': 1, 'kind': 'posts', 'format': 'pdf', 'status': 'pending'}
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, job])
+    monkeypatch.setattr('api.exports.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/exports', json={'kind': 'posts', 'format': 'pdf'},
+                    headers=auth_headers())
+    assert r.status_code == 201
+    assert r.json()['status'] == 'pending'
+    assert 'Telegram' in r.json()['message']
+    # в запись попал telegram_id пользователя
+    calls = [call for cur in conn.cursors for call in cur.calls]
+    insert = next(sql for sql, _ in calls if 'INSERT INTO cd_exports' in sql)
+    assert 'telegram_id' in insert
+
+
+def test_create_export_job_bad_kind(monkeypatch):
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN])
+    monkeypatch.setattr('api.exports.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/exports', json={'kind': 'garbage', 'format': 'csv'},
+                    headers=auth_headers())
+    assert r.status_code == 422
+
+
+def test_create_export_job_finance_viewer_denied(monkeypatch):
+    viewer = {'id': 2, 'workspace_id': 3, 'user_id': 1, 'role': 'viewer', 'status': 'active', 'channel_scope': []}
+    conn = patch_db(monkeypatch, [USER_ROW, viewer])
+    monkeypatch.setattr('api.exports.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/exports', json={'kind': 'finance', 'format': 'csv'},
+                    headers=auth_headers())
+    assert r.status_code == 403
