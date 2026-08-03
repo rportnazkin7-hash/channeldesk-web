@@ -1,14 +1,12 @@
 from __future__ import annotations
-import asyncio
-import json
 import os
-import urllib.error
-import urllib.request
 import uuid
 from pathlib import Path
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+import psycopg
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from api.auth import current_user
-from api.db import connect
+from api.db import connect, database_url
 from api.permissions import membership
 from api.rbac import require_action
 from api.workspaces import audit
@@ -16,119 +14,121 @@ from api.workspaces import audit
 router = APIRouter(prefix='/api', tags=['assets'])
 
 BUCKET = 'channeldesk-assets'
-MAX_SIZE = 50 * 1024 * 1024  # 50 МБ на файл
+MAX_SIZE = 50 * 1024 * 1024  # 50 МБ
 
 
-def storage_config() -> tuple[str, str]:
+class UploadUrlRequest(BaseModel):
+    post_id: int | None = None
+    file_name: str = Field(min_length=1, max_length=255)
+    content_type: str = 'application/octet-stream'
+    size: int = Field(default=0, ge=0)
+
+
+class AttachAssetRequest(BaseModel):
+    post_id: int
+
+
+def storage_base_url() -> str:
     url = os.getenv('SUPABASE_URL', '').strip().rstrip('/')
-    key = os.getenv('SUPABASE_SERVICE_ROLE_KEY', '').strip()
-    if not url or not key:
-        raise HTTPException(503, 'Хранилище не настроено: добавьте SUPABASE_URL и SUPABASE_SERVICE_ROLE_KEY в переменные окружения Vercel')
-    return url, key
+    if not url:
+        raise HTTPException(503, 'SUPABASE_URL не задан на Vercel (Settings → Environment Variables)')
+    return url
 
 
-def public_file_url(supabase_url: str, path: str) -> str:
-    return f'{supabase_url}/storage/v1/object/public/{BUCKET}/{path}'
+def anon_key() -> str:
+    key = os.getenv('SUPABASE_ANON_KEY', '').strip()
+    if not key:
+        raise HTTPException(503, 'SUPABASE_ANON_KEY не задан на Vercel — публичный anon-ключ из Supabase → Settings → API')
+    return key
 
 
-def storage_path_from_url(file_url: str) -> str | None:
-    marker = f'/object/public/{BUCKET}/'
-    if marker in file_url:
-        return file_url.split(marker, 1)[1]
-    return None
-
-
-def _storage_post_object(url: str, key: str, bucket: str, path: str, content_type: str, data: bytes) -> None:
-    """Загрузка файла в Supabase Storage. Только байты в памяти — без temp-файлов."""
-    req = urllib.request.Request(
-        f'{url}/storage/v1/object/{bucket}/{path}',
-        data=data,
-        method='POST',
-        headers={'Authorization': f'Bearer {key}',
-                 'Content-Type': content_type,
-                 'Content-Length': str(len(data))},
-    )
-    with urllib.request.urlopen(req, timeout=120):
-        pass
-
-
-def _storage_delete_object(url: str, key: str, bucket: str, path: str) -> None:
-    req = urllib.request.Request(
-        f'{url}/storage/v1/object/{bucket}/{path}',
-        method='DELETE',
-        headers={'Authorization': f'Bearer {key}'},
-    )
-    with urllib.request.urlopen(req, timeout=30):
-        pass
-
-
-def _storage_create_bucket(url: str, key: str) -> None:
-    body = json.dumps({'name': BUCKET, 'public': True}).encode('utf-8')
-    req = urllib.request.Request(
-        f'{url}/storage/v1/bucket',
-        data=body,
-        method='POST',
-        headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
-    )
-    with urllib.request.urlopen(req, timeout=15):
-        pass
+def public_file_url(path: str) -> str:
+    return f'{storage_base_url()}/storage/v1/object/public/{BUCKET}/{path}'
 
 
 def ensure_bucket() -> None:
-    """Идемпотентно создаёт публичный bucket (пропускает, если env не настроены)."""
+    """Создаёт bucket и RLS-политику для прямой загрузки из браузера.
+
+    Работает через БД (psycopg) — Storage API из Vercel недоступен ([Errno 16] EBUSY).
+    Политики разрешают только INSERT анонимам в этот bucket; список/удаление
+    идут через backend (который проверяет права).
+    """
     try:
-        url, key = storage_config()
-    except HTTPException:
-        return
-    try:
-        _storage_create_bucket(url, key)
+        url = database_url()
     except Exception:
-        pass  # «already exists» и прочие ошибки не критичны — upload покажет точную причину
+        return
+    statements = [
+        "INSERT INTO storage.buckets (id, name, public) VALUES ('channeldesk-assets','channeldesk-assets',true) "
+        "ON CONFLICT (id) DO NOTHING",
+        "ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY",
+        """DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects'
+                         AND policyname='cd_anon_upload') THEN
+            CREATE POLICY "cd_anon_upload" ON storage.objects FOR INSERT TO anon
+            WITH CHECK (bucket_id = 'channeldesk-assets');
+          END IF;
+        END $$;""",
+    ]
+    try:
+        with psycopg.connect(url) as conn:
+            with conn.cursor() as cur:
+                for statement in statements:
+                    cur.execute(statement)
+            conn.commit()
+    except Exception:
+        pass  # не критично при старте; конкретный upload покажет точную причину
 
 
-@router.post('/workspaces/{workspace_id}/assets', status_code=201)
-async def upload_asset(workspace_id: int,
-                       file: UploadFile = File(...),
-                       post_id: int | None = Form(default=None),
-                       user: dict = Depends(current_user)):
+@router.post('/workspaces/{workspace_id}/assets/upload-url', status_code=201)
+def create_upload_url(workspace_id: int, payload: UploadUrlRequest, user: dict = Depends(current_user)):
+    """Выдаёт клиенту адрес для прямой загрузки в Supabase Storage (из браузера)."""
     member = membership(user['id'], workspace_id)
     require_action(member, 'post.edit')
-    data = await file.read()
-    await file.close()  # освобождаем spooled-файл сразу, не дожидаясь GC
-    if not data:
-        raise HTTPException(422, 'Пустой файл')
-    if len(data) > MAX_SIZE:
+    if payload.size > MAX_SIZE:
         raise HTTPException(413, 'Файл больше 50 МБ')
-    url, key = storage_config()
-    if post_id is not None:
+    if payload.post_id is not None:
         with connect() as conn, conn.cursor() as cur:
-            cur.execute('SELECT id FROM cd_posts WHERE id=%s AND workspace_id=%s', (post_id, workspace_id))
+            cur.execute('SELECT id FROM cd_posts WHERE id=%s AND workspace_id=%s', (payload.post_id, workspace_id))
             if not cur.fetchone():
                 raise HTTPException(422, 'Публикация не принадлежит этому рабочему пространству')
-    ext = Path(file.filename or 'file').suffix.lower() or ''
-    storage_path = f'{workspace_id}/{uuid.uuid4().hex}{ext}'
-    content_type = file.content_type or 'application/octet-stream'
-    try:
-        # ВАЖНО: синхронный сетевой вызов — только в отдельном потоке (to_thread).
-        # Прямой вызов в event loop async-эндпоинта даёт [Errno 16] EBUSY на Vercel.
-        await asyncio.to_thread(_storage_post_object, url, key, BUCKET, storage_path, content_type, data)
-    except urllib.error.HTTPError as exc:
-        body = exc.read(300).decode('utf-8', 'replace')
-        raise HTTPException(502, f'Хранилище вернуло ошибку {exc.code}: {body}')
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        errno = getattr(exc, 'errno', None)
-        reason = getattr(exc, 'reason', exc)
-        raise HTTPException(503, f'Сеть до хранилища недоступна: {reason} (errno={errno})')
-    file_url = public_file_url(url, storage_path)
+    ext = Path(payload.file_name).suffix.lower() or ''
+    path = f'{workspace_id}/{uuid.uuid4().hex}{ext}'
+    file_url = public_file_url(path)
     with connect() as conn, conn.cursor() as cur:
         cur.execute("""INSERT INTO cd_content_assets(workspace_id,post_id,file_name,file_type,file_url,size_bytes,uploaded_by)
         VALUES(%s,%s,%s,%s,%s,%s,%s) RETURNING *""",
-                    (workspace_id, post_id, file.filename or 'file', content_type,
-                     file_url, len(data), user['id']))
+                    (workspace_id, payload.post_id, payload.file_name, payload.content_type,
+                     file_url, payload.size, user['id']))
         row = cur.fetchone()
-        if post_id:
-            audit(cur, workspace_id, user['id'], 'asset.uploaded', 'asset', row['id'])
-        return row
+        audit(cur, workspace_id, user['id'], 'asset.upload_started', 'asset', row['id'])
+    return {
+        'asset_id': row['id'],
+        'file_url': file_url,
+        'upload_url': f"{storage_base_url()}/storage/v1/object/{BUCKET}/{path}",
+        'anon_key': anon_key(),
+        'bucket': BUCKET,
+    }
+
+
+@router.patch('/assets/{asset_id}/post', status_code=200)
+def attach_asset(asset_id: int, payload: AttachAssetRequest, user: dict = Depends(current_user)):
+    """Привязывает ранее созданное вложение к посту (если post_id не был указан при создании)."""
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute("""SELECT a.*, wm.workspace_id FROM cd_content_assets a
+        JOIN cd_workspace_members wm ON wm.workspace_id=a.workspace_id AND wm.user_id=%s AND wm.status='active'
+        WHERE a.id=%s""", (user['id'], asset_id))
+        asset = cur.fetchone()
+        if not asset:
+            raise HTTPException(404, 'Вложение не найдено')
+        cur.execute('SELECT role FROM cd_workspace_members WHERE workspace_id=%s AND user_id=%s AND status=%s',
+                    (asset['workspace_id'], user['id'], 'active'))
+        require_action({'role': cur.fetchone()['role']}, 'post.edit')
+        cur.execute('SELECT id FROM cd_posts WHERE id=%s AND workspace_id=%s', (payload.post_id, asset['workspace_id']))
+        if not cur.fetchone():
+            raise HTTPException(422, 'Публикация не принадлежит этому рабочему пространству')
+        cur.execute('UPDATE cd_content_assets SET post_id=%s WHERE id=%s RETURNING *', (payload.post_id, asset_id))
+        return cur.fetchone()
 
 
 @router.get('/workspaces/{workspace_id}/assets')
@@ -146,6 +146,7 @@ def list_assets(workspace_id: int, post_id: int | None = None, user: dict = Depe
 
 @router.delete('/assets/{asset_id}', status_code=204)
 def delete_asset(asset_id: int, user: dict = Depends(current_user)):
+    """Удаляет запись и объект из storage (через БД — Storage API из Vercel недоступен)."""
     with connect() as conn, conn.cursor() as cur:
         cur.execute("""SELECT a.*, wm.workspace_id FROM cd_content_assets a
         JOIN cd_workspace_members wm ON wm.workspace_id=a.workspace_id AND wm.user_id=%s AND wm.status='active'
@@ -157,13 +158,13 @@ def delete_asset(asset_id: int, user: dict = Depends(current_user)):
                     (asset['workspace_id'], user['id'], 'active'))
         role_row = cur.fetchone()
         require_action({'role': role_row['role']}, 'post.edit')
-        path = storage_path_from_url(asset['file_url'])
-        if path:
+        marker = f'/object/public/{BUCKET}/'
+        if marker in asset['file_url']:
+            path = asset['file_url'].split(marker, 1)[1]
             try:
-                url, key = storage_config()
-                _storage_delete_object(url, key, BUCKET, path)
+                cur.execute("DELETE FROM storage.objects WHERE bucket_id=%s AND name=%s", (BUCKET, path))
             except Exception:
-                pass  # удаляем запись, даже если storage недоступен
+                pass  # удаляем запись, даже если объект не удалился
         cur.execute('DELETE FROM cd_content_assets WHERE id=%s', (asset_id,))
         audit(cur, asset['workspace_id'], user['id'], 'asset.deleted', 'asset', asset_id)
         return None

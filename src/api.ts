@@ -23,16 +23,15 @@ export type Comment={id:number;text:string;created_at:string;username:string|nul
 export type Version={id:number;title:string;text:string;created_by:number|null;created_at:string}
 export type Template={id:number;name:string;title:string;text:string}
 export type Asset={id:number;file_name:string;file_type:string;file_url:string;size_bytes:number|null}
-async function upload<T>(path:string,form:FormData):Promise<T>{
- const h=new Headers();const data=window.Telegram?.WebApp?.initData;if(data)h.set('X-Telegram-Init-Data',data)
- const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),60000)
+export type UploadTicket={asset_id:number;file_url:string;upload_url:string;anon_key:string;bucket:string}
+async function uploadDirect(ticket:UploadTicket,file:File):Promise<void>{
+ const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),90000)
  try{
-  const r=await fetch(path,{method:'POST',body:form,headers:h,signal:ctrl.signal})
-  if(!r.ok){let m=`Ошибка ${r.status}`;try{const j=await r.json();m=j.detail||m}catch{}throw new Error(m)}
-  return r.json()
+  const r=await fetch(ticket.upload_url,{method:'POST',body:file,headers:{'Content-Type':file.type||'application/octet-stream','Authorization':`Bearer ${ticket.anon_key}`,'apikey':ticket.anon_key},signal:ctrl.signal})
+  if(!r.ok){let m=`Ошибка ${r.status}`;try{const j=await r.json();m=j.message||j.error||m}catch{}throw new Error(`Загрузка файла в хранилище: ${m}`)}
  }catch(e){
-  if(e instanceof DOMException&&e.name==='AbortError')throw new Error('Загрузка файла не завершилась за 60 секунд')
-  if(e instanceof TypeError)throw new Error('Нет соединения с сервером')
+  if(e instanceof DOMException&&e.name==='AbortError')throw new Error('Загрузка файла не завершилась за 90 секунд')
+  if(e instanceof TypeError)throw new Error('Нет соединения со хранилищем. Проверьте интернет')
   throw e
  }finally{clearTimeout(timer)}
 }
@@ -62,6 +61,7 @@ export const api={
  createTemplate:(wid:number,p:{name:string;title:string;text:string})=>req<Template>(`/api/workspaces/${wid}/templates`,{method:'POST',body:JSON.stringify(p)}),
  deleteTemplate:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/templates/${id}`,{method:'DELETE'}),
  assets:(wid:number,postId?:number)=>req<Asset[]>(`/api/workspaces/${wid}/assets${postId!=null?`?post_id=${postId}`:''}`),
- uploadAsset:(wid:number,file:File,postId?:number|null)=>{const fd=new FormData();fd.append('file',file);if(postId!=null)fd.append('post_id',String(postId));return upload<Asset>(`/api/workspaces/${wid}/assets`,fd)},
+ uploadTicket:(wid:number,p:{post_id:number;file_name:string;content_type:string;size:number})=>req<UploadTicket>(`/api/workspaces/${wid}/assets/upload-url`,{method:'POST',body:JSON.stringify(p)}),
+ uploadDirect,
  deleteAsset:(id:number)=>req<void>(`/api/assets/${id}`,{method:'DELETE'}),
 }

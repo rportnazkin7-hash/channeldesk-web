@@ -1,6 +1,3 @@
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -26,69 +23,65 @@ def _env(monkeypatch):
     monkeypatch.setenv('DEV_API_KEY', DEV_KEY)
     monkeypatch.setenv('BOT_TOKEN', 'test-token')
     monkeypatch.setenv('SUPABASE_URL', 'https://project.supabase.co')
-    monkeypatch.setenv('SUPABASE_SERVICE_ROLE_KEY', 'svc-key')
+    monkeypatch.setenv('SUPABASE_ANON_KEY', 'anon-public-key')
 
 
-def test_upload_asset(monkeypatch):
-    captured = {}
-
-    def fake_storage_post(url, key, bucket, path, content_type, data):
-        captured['url'] = url
-        captured['key'] = key
-        captured['bucket'] = bucket
-        captured['path'] = path
-        captured['content_type'] = content_type
-        captured['data'] = data
-
-    monkeypatch.setattr('api.assets._storage_post_object', fake_storage_post)
+def test_create_upload_url(monkeypatch):
     conn = patch_db(monkeypatch, [USER_ROW, MEMBER_EDITOR, {'id': 10}, ASSET_ROW])
     monkeypatch.setattr('api.assets.connect', lambda: conn)
-
-    r = client.post('/api/workspaces/3/assets',
-                    files={'file': ('pic.png', b'\x89PNG\r\n', 'image/png')},
-                    data={'post_id': '10'}, headers=auth_headers())
+    r = client.post('/api/workspaces/3/assets/upload-url',
+                    json={'post_id': 10, 'file_name': 'pic.png', 'content_type': 'image/png', 'size': 100},
+                    headers=auth_headers())
     assert r.status_code == 201
     body = r.json()
-    assert body['file_name'] == 'pic.png'
-    assert body['file_type'] == 'image/png'
-    assert 'channeldesk-assets/3/' in body['file_url']
-    assert captured['url'] == 'https://project.supabase.co'
-    assert captured['bucket'] == 'channeldesk-assets'
-    assert captured['path'].startswith('3/')
-    assert captured['data'] == b'\x89PNG\r\n'
-    assert captured['content_type'] == 'image/png'
+    assert body['asset_id'] == 7
+    assert body['bucket'] == 'channeldesk-assets'
+    assert body['upload_url'].startswith('https://project.supabase.co/storage/v1/object/channeldesk-assets/3/')
+    assert body['file_url'].startswith('https://project.supabase.co/storage/v1/object/public/channeldesk-assets/3/')
+    assert body['anon_key'] == 'anon-public-key'
+    # upload_url содержит путь, но НЕ '/public/' (это endpoint загрузки, не публичный)
+    assert '/public/' not in body['upload_url']
 
 
-def test_upload_asset_no_storage_env(monkeypatch):
-    monkeypatch.delenv('SUPABASE_URL')
-    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_EDITOR])
+def test_create_upload_url_no_anon_key(monkeypatch):
+    monkeypatch.delenv('SUPABASE_ANON_KEY')
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_EDITOR, {'id': 10}, ASSET_ROW])
     monkeypatch.setattr('api.assets.connect', lambda: conn)
-    r = client.post('/api/workspaces/3/assets',
-                    files={'file': ('a.txt', b'data', 'text/plain')}, headers=auth_headers())
+    r = client.post('/api/workspaces/3/assets/upload-url',
+                    json={'post_id': 10, 'file_name': 'a.txt', 'content_type': 'text/plain', 'size': 5},
+                    headers=auth_headers())
     assert r.status_code == 503
-    assert 'Хранилище не настроено' in r.json()['detail']
+    assert 'SUPABASE_ANON_KEY' in r.json()['detail']
 
 
-def test_upload_empty_file_rejected(monkeypatch):
+def test_create_upload_url_no_supabase_url(monkeypatch):
+    monkeypatch.delenv('SUPABASE_URL')
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_EDITOR, {'id': 10}, ASSET_ROW])
+    monkeypatch.setattr('api.assets.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/assets/upload-url',
+                    json={'post_id': 10, 'file_name': 'a.txt', 'content_type': 'text/plain', 'size': 5},
+                    headers=auth_headers())
+    assert r.status_code == 503
+    assert 'SUPABASE_URL' in r.json()['detail']
+
+
+def test_create_upload_url_oversize(monkeypatch):
     conn = patch_db(monkeypatch, [USER_ROW, MEMBER_EDITOR])
     monkeypatch.setattr('api.assets.connect', lambda: conn)
-    r = client.post('/api/workspaces/3/assets',
-                    files={'file': ('empty.txt', b'', 'text/plain')}, headers=auth_headers())
+    r = client.post('/api/workspaces/3/assets/upload-url',
+                    json={'post_id': 10, 'file_name': 'big.mp4', 'content_type': 'video/mp4',
+                          'size': 51 * 1024 * 1024}, headers=auth_headers())
+    assert r.status_code == 413
+
+
+def test_create_upload_url_wrong_post(monkeypatch):
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_EDITOR, None])  # пост не найден
+    monkeypatch.setattr('api.assets.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/assets/upload-url',
+                    json={'post_id': 999, 'file_name': 'a.txt', 'content_type': 'text/plain', 'size': 5},
+                    headers=auth_headers())
     assert r.status_code == 422
-
-
-def test_upload_storage_http_error(monkeypatch):
-    def boom(*a, **k):
-        import urllib.error
-        raise urllib.error.HTTPError('url', 400, 'Bad Request', None, None)
-
-    monkeypatch.setattr('api.assets._storage_post_object', boom)
-    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_EDITOR])
-    monkeypatch.setattr('api.assets.connect', lambda: conn)
-    r = client.post('/api/workspaces/3/assets',
-                    files={'file': ('a.txt', b'data', 'text/plain')}, headers=auth_headers())
-    assert r.status_code == 502
-    assert '400' in r.json()['detail']
+    assert 'Публикация' in r.json()['detail']
 
 
 def test_list_assets(monkeypatch):
@@ -100,73 +93,64 @@ def test_list_assets(monkeypatch):
     assert r.json()[0]['file_name'] == 'pic.png'
 
 
-def test_delete_asset(monkeypatch):
-    deleted = []
-
-    def fake_storage_delete(url, key, bucket, path):
-        deleted.append((bucket, path))
-
-    monkeypatch.setattr('api.assets._storage_delete_object', fake_storage_delete)
+def test_delete_asset_removes_storage_object(monkeypatch):
     conn = patch_db(monkeypatch, [USER_ROW, ASSET_ROW, {'role': 'editor'}, MEMBER_EDITOR])
     monkeypatch.setattr('api.assets.connect', lambda: conn)
     r = client.delete('/api/assets/7', headers=auth_headers())
     assert r.status_code == 204
-    assert ('channeldesk-assets', '3/abc.png') in deleted
+    # объект удалён из storage.objects (имя передано параметром) + запись удалена
+    calls = [call for cur in conn.cursors for call in cur.calls]
+    storage_deletes = [(sql, params) for sql, params in calls
+                       if sql.startswith('DELETE') and 'storage.objects' in sql]
+    assert storage_deletes
+    sql, params = storage_deletes[0]
+    assert 'channeldesk-assets' in params
+    assert '3/abc.png' in params
+    assert any(sql.startswith('DELETE') and 'cd_content_assets' in sql for sql, _ in calls)
 
 
-class _Handler(BaseHTTPRequestHandler):
-    """Локальный HTTP-сервер, имитирующий Supabase Storage: принимает POST/DELETE."""
-    received: list = []
-
-    def do_POST(self):
-        length = int(self.headers.get('Content-Length', 0))
-        body = self.rfile.read(length)
-        type(self).received.append((self.path, self.headers.get('Authorization'), self.headers.get('Content-Type'), body))
-        self.send_response(200)
-        self.end_headers()
-
-    def do_DELETE(self):
-        type(self).received.append((self.path, self.headers.get('Authorization'), None, b''))
-        self.send_response(200)
-        self.end_headers()
-
-    def log_message(self, *a):
-        pass
-
-
-@pytest.fixture()
-def storage_server():
-    server = HTTPServer(('127.0.0.1', 0), _Handler)
-    _Handler.received = []
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    yield f'http://127.0.0.1:{server.server_address[1]}'
-    server.shutdown()
-
-
-def test_upload_real_http_to_storage(storage_server, monkeypatch):
-    """Интеграционный тест: реальный urllib-запрос к локальному HTTP-серверу.
-    Проверяет, что загрузка работает без httpx и без temp-файлов (чистые байты)."""
-    monkeypatch.setenv('SUPABASE_URL', storage_server)
-    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_EDITOR, {'id': 10}, ASSET_ROW])
+def test_attach_asset_to_post(monkeypatch):
+    attached = dict(ASSET_ROW, post_id=10)
+    conn = patch_db(monkeypatch, [USER_ROW, ASSET_ROW, {'role': 'editor'}, {'id': 10}, attached])
     monkeypatch.setattr('api.assets.connect', lambda: conn)
-
-    payload = b'\x89PNG\r\n' + b'x' * 200000  # 200 КБ
-    r = client.post('/api/workspaces/3/assets',
-                    files={'file': ('big.png', payload, 'image/png')},
-                    data={'post_id': '10'}, headers=auth_headers())
-    assert r.status_code == 201
-    path, auth, content_type, body = _Handler.received[0]
-    assert path.startswith('/storage/v1/object/channeldesk-assets/3/')
-    assert auth == 'Bearer svc-key'
-    assert content_type == 'image/png'
-    assert body == payload  # байты переданы без изменений
+    r = client.patch('/api/assets/7/post', json={'post_id': 10}, headers=auth_headers())
+    assert r.status_code == 200
+    assert r.json()['post_id'] == 10
 
 
-def test_delete_real_http_to_storage(storage_server, monkeypatch):
-    monkeypatch.setenv('SUPABASE_URL', storage_server)
-    conn = patch_db(monkeypatch, [USER_ROW, ASSET_ROW, {'role': 'editor'}, MEMBER_EDITOR])
-    monkeypatch.setattr('api.assets.connect', lambda: conn)
-    r = client.delete('/api/assets/7', headers=auth_headers())
-    assert r.status_code == 204
-    assert _Handler.received[0][0] == '/storage/v1/object/channeldesk-assets/3/abc.png'
+def test_ensure_bucket_creates_bucket_and_policy(monkeypatch):
+    """Проверяем, что ensure_bucket выполняет SQL (bucket + RLS политика) через psycopg."""
+    executed = []
+
+    class FakeCur:
+        def execute(self, sql, params=None):
+            executed.append(sql)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCur()
+
+        def commit(self):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setenv('DATABASE_URL', 'postgresql://u:p@localhost/db')
+    monkeypatch.setattr('api.assets.psycopg.connect', lambda *a, **k: FakeConn())
+
+    from api.assets import ensure_bucket
+    ensure_bucket()
+    joined = '\n'.join(executed)
+    assert 'storage.buckets' in joined and 'channeldesk-assets' in joined
+    assert 'CREATE POLICY' in joined
+    assert 'cd_anon_upload' in joined
