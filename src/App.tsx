@@ -2,7 +2,7 @@ import { useCallback,useEffect,useState } from 'react'
 import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download } from 'lucide-react'
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit,type Task } from './api'
 
-const APP_VERSION = 'v0.17.1'
+const APP_VERSION = 'v0.17.2'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
@@ -421,8 +421,12 @@ export default function App(){
   </section>}
 
   <div className="ver">ChannelDesk {APP_VERSION}</div>
- </main><nav>{([[BarChart3,'Обзор','overview'],[CalendarDays,'Календарь','calendar'],[Megaphone,'Реклама','ads'],[MoreHorizontal,'Ещё','more']] as [typeof BarChart3,string,Tab][]).map(([Icon,label,t])=>{const C=Icon as typeof BarChart3;return <button key={label} className={tab===t?'active':''} onClick={()=>{buzz();setTab(t)}}><C size={21}/><span>{label}</span></button>})}
+ </main><nav>
+  <button className={tab==='overview'?'active':''} onClick={()=>{buzz();setTab('overview')}}><BarChart3 size={21}/><span>Обзор</span></button>
+  <button className={tab==='calendar'?'active':''} onClick={()=>{buzz();setTab('calendar')}}><CalendarDays size={21}/><span>Календарь</span></button>
   <button className="fab" onClick={()=>{buzz();setFabOpen(!fabOpen)}} title="Создать"><CirclePlus size={26}/><span>Создать</span></button>
+  <button className={tab==='ads'?'active':''} onClick={()=>{buzz();setTab('ads')}}><Megaphone size={21}/><span>Реклама</span></button>
+  <button className={tab==='more'?'active':''} onClick={()=>{buzz();setTab('more')}}><MoreHorizontal size={21}/><span>Ещё</span></button>
  </nav>
  {fabOpen&&<div className="fab-overlay" onClick={()=>setFabOpen(false)}>
   <div className="fab-sheet" onClick={e=>e.stopPropagation()}>
