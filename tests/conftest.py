@@ -55,4 +55,6 @@ def patch_db(monkeypatch, script):
     conn = FakeConn(script)
     monkeypatch.setattr('api.auth.connect', lambda: conn)
     monkeypatch.setattr('api.permissions.connect', lambda: conn)
+    # Ключевое: api.db.connect — единый источник (остальные модули импортируют его как connect)
+    monkeypatch.setattr('api.db.connect', lambda: conn)
     return conn

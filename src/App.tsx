@@ -2,7 +2,7 @@ import { useCallback,useEffect,useState } from 'react'
 import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download } from 'lucide-react'
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit,type Task } from './api'
 
-const APP_VERSION = 'v0.19.0'
+const APP_VERSION = 'v0.19.1'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
@@ -43,7 +43,7 @@ export default function App(){
  const [templates,setTemplates]=useState<Template[]>([]),[newTplName,setNewTplName]=useState(''),[btnText,setBtnText]=useState(''),[btnUrl,setBtnUrl]=useState('')
  const [advertisers,setAdvertisers]=useState<Advertiser[]>([]),[bookings,setBookings]=useState<Booking[]>([]),[finSummary,setFinSummary]=useState<FinanceSummary|null>(null)
  const [advName,setAdvName]=useState(''),[advContact,setAdvContact]=useState('')
- const [bkAdv,setBkAdv]=useState<number|null>(null),[bkChannel,setBkChannel]=useState<number|null>(null),[bkCost,setBkCost]=useState(''),[bkDate,setBkDate]=useState(''),[bkErid,setBkErid]=useState(''),[bkNoErid,setBkNoErid]=useState(false)
+ const [bkAdv,setBkAdv]=useState<number|null>(null),[bkChannel,setBkChannel]=useState<number|null>(null),[bkCost,setBkCost]=useState(''),[bkDate,setBkDate]=useState(''),[bkTime,setBkTime]=useState('12:00'),[bkErid,setBkErid]=useState(''),[bkNoErid,setBkNoErid]=useState(false)
  const [finType,setFinType]=useState<'income'|'expense'>('income'),[finAmount,setFinAmount]=useState(''),[finDesc,setFinDesc]=useState('')
  const [mediaKits,setMediaKits]=useState<MediaKit[]>([])
  const [showMediaKits,setShowMediaKits]=useState(false)
@@ -64,7 +64,7 @@ export default function App(){
  useEffect(()=>{const timer=setInterval(()=>{refresh()},3000);return ()=>clearInterval(timer)},[refresh])
  async function addAdvertiser(){buzz();if(!active)return;setError('');try{await api.createAdvertiser(active.id,{name:advName,notes:advContact});setAdvName('');setAdvContact('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления рекламодателя')}}
  async function delAdvertiser(id:number){buzz();if(!active)return;try{await api.deleteAdvertiser(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления рекламодателя')}}
- async function addBooking(){buzz();if(!active)return;setError('');try{await api.createBooking(active.id,{advertiser_id:bkAdv??0,cost:Number(bkCost)||0,channel_id:bkChannel,publish_at:bkDate?new Date(bkDate).toISOString():null,erid:bkNoErid?null:(bkErid||null),erid_required:!bkNoErid});setBkAdv(null);setBkCost('');setBkDate('');setBkErid('');setBkNoErid(false);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания брони')}}
+ async function addBooking(){buzz();if(!active)return;setError('');try{await api.createBooking(active.id,{advertiser_id:bkAdv??0,cost:Number(bkCost)||0,channel_id:bkChannel,publish_at:bkDate?new Date(`${bkDate}T${bkTime||'12:00'}`).toISOString():null,delete_at:bkDate&&bkTime?new Date(new Date(`${bkDate}T${bkTime||'12:00'}`).getTime()+7*86400000).toISOString():null,erid:bkNoErid?null:(bkErid||null),erid_required:!bkNoErid});setBkAdv(null);setBkCost('');setBkDate('');setBkTime('12:00');setBkErid('');setBkNoErid(false);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания брони')}}
  async function payBooking(id:number){buzz();if(!active)return;try{await api.payBooking(active.id,id,'paid');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка отметки оплаты')}}
  async function delBooking(id:number){buzz();if(!active)return;try{await api.deleteBooking(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления брони')}}
  async function addFinance(){buzz();if(!active)return;setError('');try{await api.createTransaction(active.id,{type:finType,amount:Number(finAmount)||0,category:finType==='income'?'advertising':'other',description:finDesc});setFinAmount('');setFinDesc('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления транзакции')}}
@@ -322,8 +322,13 @@ export default function App(){
    </select>
    <div className="btn-row" style={{marginTop:14}}>
     <input className="field" placeholder="Стоимость, ₽" type="number" value={bkCost} onChange={e=>setBkCost(e.target.value)}/>
-    <input className="field" placeholder="Дата" type="date" value={bkDate} onChange={e=>setBkDate(e.target.value)}/>
    </div>
+   <label className="form-label">Начало публикации (дата и время)</label>
+   <div className="btn-row">
+    <input className="field" type="date" value={bkDate} onChange={e=>setBkDate(e.target.value)}/>
+    <input className="field" type="time" value={bkTime} onChange={e=>setBkTime(e.target.value)}/>
+   </div>
+   <div style={{fontSize:11,color:'var(--muted-2)',marginTop:6}}>Окончание — через 7 дней после начала.</div>
    <label className="form-label" style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}}>
     <input type="checkbox" checked={bkNoErid} onChange={e=>setBkNoErid(e.target.checked)} style={{width:18,height:18,accentColor:'var(--accent-2)'}}/>
     <span>ERID не требуется (обычный Telegram-канал)</span>

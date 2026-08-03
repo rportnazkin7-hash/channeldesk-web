@@ -194,6 +194,25 @@ def create_booking(workspace_id: int, payload: BookingCreate, user: dict = Depen
                      payload.publish_at, payload.delete_at, payload.erid, payload.erid_required,
                      json.dumps(payload.requisites), payload.materials_url, user['id']))
         row = cur.fetchone()
+        # Авто-публикация: если бронь с каналом и датой — создаём scheduled-пост,
+        # publisher опубликует его в publish_at. Текст — заглушка (материал добавит редактор).
+        if row.get('channel_id') and row.get('publish_at'):
+            adv_name = 'Реклама'
+            cur.execute('SELECT name FROM cd_advertisers WHERE id=%s', (row['advertiser_id'],))
+            adv = cur.fetchone()
+            if adv:
+                adv_name = adv['name']
+            import uuid
+            publish_key = uuid.uuid4().hex
+            text = f'Рекламный пост: {adv_name}' + (f'\n{row.get("erid", "")}' if row.get('erid') else '')
+            cur.execute("""INSERT INTO cd_posts(workspace_id,channel_id,title,text,status,approval_required,
+            scheduled_at,publish_key,created_by)
+            VALUES(%s,%s,%s,%s,'scheduled',false,%s,%s,%s) RETURNING id""",
+                        (workspace_id, row['channel_id'], f'Реклама: {adv_name}', text,
+                         row['publish_at'], publish_key, user['id']))
+            post_row = cur.fetchone()
+            cur.execute('UPDATE cd_ad_bookings SET post_id=%s WHERE id=%s', (post_row['id'], row['id']))
+            row['post_id'] = post_row['id']
         audit(cur, workspace_id, user['id'], 'booking.created', 'booking', row['id'])
         return row
 

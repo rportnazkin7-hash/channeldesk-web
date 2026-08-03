@@ -177,3 +177,57 @@ def test_mark_paid_activates_started_booking(monkeypatch):
     r = client.post('/api/workspaces/3/bookings/5/pay', json={'payment_status': 'paid'}, headers=auth_headers())
     assert r.status_code == 200
     assert r.json()['status'] == 'active'
+
+
+def test_create_booking_creates_scheduled_post(monkeypatch):
+    """Бронь с каналом и датой авто-создаёт scheduled-пост для публикации."""
+    from datetime import datetime, timedelta, timezone
+    booking_row = {'id': 5, 'workspace_id': 3, 'advertiser_id': 1, 'channel_id': 9, 'post_id': 77,
+                   'format': 'post', 'cost': 5000, 'currency': 'RUB', 'status': 'requested',
+                   'payment_status': 'unpaid', 'publish_at': datetime.now(timezone.utc) + timedelta(days=1),
+                   'delete_at': None, 'erid': 'erid:1', 'erid_required': True, 'requisites': {},
+                   'materials_url': None, 'created_by': 1}
+    post_row = {'id': 77}
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, {'id': 1}, {'id': 9}, booking_row, {'name': 'ООО Реклама'}, post_row])
+    monkeypatch.setattr('api.ads.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/bookings',
+                    json={'advertiser_id': 1, 'channel_id': 9, 'cost': 5000,
+                          'publish_at': (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()},
+                    headers=auth_headers())
+    assert r.status_code == 201
+    body = r.json()
+    assert body['post_id'] == 77
+    calls = [call for cur in conn.cursors for call in cur.calls]
+    assert any('INSERT INTO cd_posts' in sql for sql, _ in calls)
+    assert any('scheduled' in sql and 'publish_key' in sql for sql, _ in calls)
+
+
+
+
+def test_mark_paid_confirms_future_booking(monkeypatch):
+    """Оплата будущей брони переводит её в confirmed."""
+    from datetime import datetime, timedelta, timezone
+    future = dict(BOOKING_ROW, status='requested', payment_status='unpaid',
+                  publish_at=datetime.now(timezone.utc) + timedelta(days=5))
+    paid = dict(future, status='confirmed', payment_status='paid')
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, future, paid])
+    monkeypatch.setattr('api.ads.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/bookings/5/pay', json={'payment_status': 'paid'}, headers=auth_headers())
+    assert r.status_code == 200
+    assert r.json()['status'] == 'confirmed'
+    assert r.json()['payment_status'] == 'paid'
+
+
+def test_mark_paid_activates_started_booking(monkeypatch):
+    """Оплата брони, чья дата уже наступила, делает её активной."""
+    from datetime import datetime, timedelta, timezone
+    started = dict(BOOKING_ROW, status='requested', payment_status='unpaid',
+                   publish_at=datetime.now(timezone.utc) - timedelta(days=1))
+    paid = dict(started, status='active', payment_status='paid')
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, started, paid])
+    monkeypatch.setattr('api.ads.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/bookings/5/pay', json={'payment_status': 'paid'}, headers=auth_headers())
+    assert r.status_code == 200
+    assert r.json()['status'] == 'active'
+
+
