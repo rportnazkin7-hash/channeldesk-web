@@ -210,7 +210,7 @@ export default function Analytics({ workspaceId, channels, onBack, onError }: Pr
 
       <section className="analytics-card analytics-chart-card">
         <div className="analytics-section-heading"><strong>Динамика</strong><span className="analytics-legend"><i className="legend-income" /> просмотры <i className="legend-expense" /> охват</span></div>
-        <div className="analytics-chart-scroll">
+        <div className={`analytics-chart-scroll${series.length === 0 ? ' is-empty' : ''}`}>
           {series.length === 0 ? <div className="analytics-empty-chart">Нет данных за период</div> : <div className="analytics-chart-columns">{series.map(point => <div className="analytics-chart-column" key={point.date} title={`${point.date}: ${formattedNumber(point.views)} просмотров, ${formattedNumber(point.reach)} охвата`}>
             <div className="analytics-chart-bars"><i className="trend-income" style={{ height: `${Math.max(point.views ? 5 : 0, point.views / chartMax * 100)}%` }} /><i className="trend-expense" style={{ height: `${Math.max(point.reach ? 5 : 0, point.reach / chartMax * 100)}%` }} /></div>
             <span>{shortDate(point.date)}</span>
@@ -221,8 +221,8 @@ export default function Analytics({ workspaceId, channels, onBack, onError }: Pr
       <section className="analytics-card analytics-form-card">
         <div className="analytics-section-heading"><div><strong>Добавить дневную метрику</strong><span>За одну дату и канал. Повторное сохранение обновит запись.</span></div><TrendingUp size={16} /></div>
         <div className="analytics-form-grid">
-          <label className="analytics-control"><span>Канал</span><select className="field" value={metric.channel_id || ''} onChange={event => setMetric(current => ({ ...current, channel_id: Number(event.target.value) || 0 }))}><option value="">Выберите канал</option>{channels.map(channel => <option key={channel.id} value={channel.id}>{channel.title}</option>)}</select></label>
-          <label className="analytics-control"><span>Дата</span><input className="field" type="date" value={metric.metric_date} onChange={event => setMetric(current => ({ ...current, metric_date: event.target.value }))} /></label>
+          <label className="analytics-control analytics-form-primary"><span>Канал</span><select className="field" value={metric.channel_id || ''} onChange={event => setMetric(current => ({ ...current, channel_id: Number(event.target.value) || 0 }))}><option value="">Выберите канал</option>{channels.map(channel => <option key={channel.id} value={channel.id}>{channel.title}</option>)}</select></label>
+          <label className="analytics-control analytics-form-primary"><span>Дата</span><input className="field" type="date" value={metric.metric_date} onChange={event => setMetric(current => ({ ...current, metric_date: event.target.value }))} /></label>
           {METRIC_FIELDS.map(([key, label]) => renderMetricField(key, label))}
         </div>
         <label className="analytics-control analytics-control-wide"><span>Заметка</span><input className="field" placeholder="Необязательно" value={metric.notes} onChange={event => setMetric(current => ({ ...current, notes: event.target.value }))} /></label>
