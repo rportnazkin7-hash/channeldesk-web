@@ -2,10 +2,11 @@ import { useEffect,useState } from 'react'
 import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X } from 'lucide-react'
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset } from './api'
 
-const APP_VERSION = 'v0.10.0'
+const APP_VERSION = 'v0.10.1'
 type Tab = 'overview'|'calendar'|'create'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
+const MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
 function buzz(){try{window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')}catch{}}
 function dayKey(d:Date){return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`}
@@ -144,38 +145,41 @@ export default function App(){
 
   {tab==='calendar'&&<>
    {!active?<section className="panel"><div className="empty"><div className="empty-icon"><CalendarDays/></div><h3>Создайте рабочее пространство</h3><p>Календарь публикаций появится после создания пространства и подключения канала.</p></div></section>:<>
-    <section id="draft-form" className="panel"><div className="panel-title"><h2>Новый черновик</h2><FileText size={20}/></div>
-     <input placeholder="Заголовок" value={newTitle} onChange={e=>setNewTitle(e.target.value)} style={{width:'100%',padding:12,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white',margin:'12px 0 10px'}}/>
-     <textarea placeholder="Текст (Telegram HTML: <b>, <i>, <a href=…>)" value={newText} onChange={e=>setNewText(e.target.value)} rows={3} style={{width:'100%',padding:12,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white',resize:'vertical'}}/>
-     <div style={{display:'flex',gap:10,alignItems:'center',margin:'12px 0'}}>
-      <select value={draftChannel??''} onChange={e=>setDraftChannel(e.target.value?Number(e.target.value):null)} style={{flex:1,padding:12,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white'}}>
-       <option value="">— без канала —</option>
-       {channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}
-      </select>
+    <section id="draft-form" className="panel">
+     <div className="panel-title"><h2>Новый черновик</h2><FileText size={20}/></div>
+     <label className="form-label">Заголовок</label>
+     <input className="field" placeholder="О чём пост?" value={newTitle} onChange={e=>setNewTitle(e.target.value)}/>
+     <label className="form-label">Текст (Telegram HTML: &lt;b&gt;, &lt;i&gt;, &lt;a href=…&gt;)</label>
+     <textarea className="field" rows={4} placeholder="Текст публикации…" value={newText} onChange={e=>setNewText(e.target.value)}/>
+     <label className="form-label">Канал</label>
+     <select className="field" value={draftChannel??''} onChange={e=>setDraftChannel(e.target.value?Number(e.target.value):null)}>
+      <option value="">— без канала —</option>
+      {channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}
+     </select>
+     <label className="form-label">Кнопки (до 8)</label>
+     <div className="btn-row">
+      <input className="field" placeholder="Текст кнопки" value={draftBtnText} onChange={e=>setDraftBtnText(e.target.value)}/>
+      <input className="field" placeholder="https://…" value={draftBtnUrl} onChange={e=>setDraftBtnUrl(e.target.value)}/>
+      <button className="icon-btn" onClick={addDraftBtn} disabled={!draftBtnText.trim()||!draftBtnUrl.trim()} title="Добавить кнопку"><Plus size={16}/></button>
      </div>
-     <div style={{margin:'10px 0'}}>
-      <strong style={{fontSize:13}}>Кнопки (до 8)</strong>
-      <div style={{display:'flex',gap:8,marginTop:8}}>
-       <input placeholder="Текст кнопки" value={draftBtnText} onChange={e=>setDraftBtnText(e.target.value)} style={{flex:1,padding:11,borderRadius:10,border:'1px solid #445',background:'#111722',color:'white',fontSize:13}}/>
-       <input placeholder="https://…" value={draftBtnUrl} onChange={e=>setDraftBtnUrl(e.target.value)} style={{flex:1.5,padding:11,borderRadius:10,border:'1px solid #445',background:'#111722',color:'white',fontSize:13}}/>
-       <button onClick={addDraftBtn} disabled={!draftBtnText.trim()||!draftBtnUrl.trim()}><Plus size={15}/></button>
-      </div>
-      {draftBtns.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:8}}>{draftBtns.map((b,i)=><span key={i} className="btn-chip">🔗 {b.text} <button onClick={()=>{buzz();setDraftBtns(draftBtns.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'#ff9b9b',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
-     </div>
-     <div style={{margin:'10px 0'}}>
-      <strong style={{fontSize:13}}>Вложения (фото, видео, документы)</strong>
-      <label className="file-btn"><Paperclip size={15}/> Выбрать файлы<input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" style={{display:'none'}} onChange={e=>pickFiles(e.target.files)}/></label>
-      {draftFiles.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:8}}>{draftFiles.map((f,i)=><span key={i} className="btn-chip">📎 {f.name.length>22?f.name.slice(0,22)+'…':f.name} <button onClick={()=>{buzz();setDraftFiles(draftFiles.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'#ff9b9b',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
-     </div>
-     <button onClick={createDraft} disabled={busy||!newTitle.trim()} style={{width:'100%'}}><CirclePlus size={18}/> Создать черновик {draftFiles.length?`(${draftFiles.length} вл.)`:''}</button>
-     {templates.length>0&&<div style={{marginTop:8}}><span style={{color:'#8d96a8',fontSize:12}}>Шаблоны: </span>{templates.map(t=><button key={t.id} onClick={()=>useTemplate(t)} disabled={busy} className="chip-btn">{t.name}</button>)}</div>}
+     {draftBtns.length>0&&<div className="chip-wrap">{draftBtns.map((b,i)=><span key={i} className="btn-chip">🔗 {b.text} <button onClick={()=>{buzz();setDraftBtns(draftBtns.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'#ff9b9b',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
+     <label className="form-label">Вложения (фото, видео, документы)</label>
+     <label className="file-btn"><Paperclip size={15}/> Выбрать файлы<input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" style={{display:'none'}} onChange={e=>pickFiles(e.target.files)}/></label>
+     {draftFiles.length>0&&<div className="chip-wrap">{draftFiles.map((f,i)=><span key={i} className="btn-chip">📎 {f.name.length>22?f.name.slice(0,22)+'…':f.name} <button onClick={()=>{buzz();setDraftFiles(draftFiles.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'#ff9b9b',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
+     <button className="primary-btn" onClick={createDraft} disabled={busy||!newTitle.trim()}><CirclePlus size={18}/> Создать черновик {draftFiles.length?`(${draftFiles.length} вл.)`:''}</button>
+     {templates.length>0&&<div style={{marginTop:14}}><span style={{color:'#8d96a8',fontSize:12}}>Шаблоны: </span>{templates.map(t=><button key={t.id} onClick={()=>useTemplate(t)} disabled={busy} className="chip-btn">{t.name}</button>)}</div>}
     </section>
 
-    <section className="panel" style={{marginTop:14}}><div className="panel-title"><h2>{calMonth+1}/{calYear}</h2><div style={{display:'flex',gap:6}}><button onClick={()=>{buzz();setCalMonth(m=>m===0?(setCalYear(y=>y-1),11):m-1)}} disabled={busy} className="icon-btn"><ChevronLeft size={16}/></button><button onClick={()=>{buzz();setCalMonth(m=>m===11?(setCalYear(y=>y+1),0):m+1)}} disabled={busy} className="icon-btn"><ChevronRight size={16}/></button></div></div>
+    <section className="panel" style={{marginTop:14}}>
+     <div className="cal-head">
+      <button className="icon-btn" onClick={()=>{buzz();setCalMonth(m=>m===0?(setCalYear(y=>y-1),11):m-1)}}><ChevronLeft size={17}/></button>
+      <strong>{MONTHS[calMonth]} {calYear}</strong>
+      <button className="icon-btn" onClick={()=>{buzz();setCalMonth(m=>m===11?(setCalYear(y=>y+1),0):m+1)}}><ChevronRight size={17}/></button>
+     </div>
      <div className="cal-grid">{['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(d=><div key={d} className="cal-dow">{d}</div>)}
       {calCells.map((d,i)=>d?(()=>{const k=dayKey(d);const has=posts.some(p=>postDayKey(p)===k);const sel=selectedDay&&dayKey(selectedDay)===k;return <button key={i} className={"cal-day"+(has?' has':'')+(sel?' sel':'')+(k===todayKey?' today':'')} onClick={()=>{buzz();setSelectedDay(sel?null:d)}}><span>{d.getDate()}</span>{has&&<i/>}</button>})():<div key={i} className="cal-day empty"/>)}
      </div>
-     <div style={{marginTop:6,fontSize:11,color:'#5b6475'}}>{selectedDay?`Посты за ${selectedDay.getDate()}.${selectedDay.getMonth()+1}`:'Показаны все посты · выберите день для фильтра'}</div>
+     <div className="cal-hint">{selectedDay?`Посты за ${selectedDay.getDate()} ${MONTHS[selectedDay.getMonth()]}`:'Выберите день, чтобы фильтровать посты'}</div>
     </section>
 
     <section className="panel" style={{marginTop:14}}><div className="panel-title"><h2>Публикации</h2><Clock size={20}/></div>
