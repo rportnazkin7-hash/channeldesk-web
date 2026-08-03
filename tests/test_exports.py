@@ -18,6 +18,9 @@ BOOKING_ROW = {'id': 5, 'advertiser_name': 'ООО Реклама', 'channel_tit
                'publish_at': None, 'erid': 'erid:1', 'erid_required': True}
 TX_ROW = {'id': 10, 'type': 'income', 'amount': 1000, 'currency': 'RUB', 'category': 'advertising',
           'description': 'Оплата', 'occurred_at': None}
+MK_ROW = {'id': 1, 'name': 'Медиакит канала', 'channel_title': 'Канал', 'description': 'Описание',
+          'stats': {'subscribers': 15000}, 'pricing': [{'format': 'post', 'price': 5000}],
+          'contacts': {'telegram': '@media'}, 'is_active': True}
 
 
 def auth_headers():
@@ -94,6 +97,33 @@ def test_export_finance_pdf(monkeypatch):
     assert r.status_code == 200
     assert 'application/pdf' in r.headers['content-type']
     assert r.content[:4] == b'%PDF'
+
+
+def test_export_media_kits_pdf(monkeypatch):
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, [MK_ROW]])
+    monkeypatch.setattr('api.exports.connect', lambda: conn)
+    r = client.get('/api/workspaces/3/export/media-kits?format=pdf', headers=auth_headers())
+    assert r.status_code == 200
+    assert 'application/pdf' in r.headers['content-type']
+    assert r.content[:4] == b'%PDF'
+
+
+def test_create_media_kit_export_job(monkeypatch):
+    job = {'id': 3, 'kind': 'media_kits', 'format': 'pdf', 'status': 'pending'}
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, job])
+    monkeypatch.setattr('api.exports.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/exports', json={'kind': 'media_kits', 'format': 'pdf'},
+                    headers=auth_headers())
+    assert r.status_code == 201
+    assert r.json()['kind'] == 'media_kits'
+
+
+def test_media_kit_export_rejects_non_pdf(monkeypatch):
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN])
+    monkeypatch.setattr('api.exports.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/exports', json={'kind': 'media_kits', 'format': 'csv'},
+                    headers=auth_headers())
+    assert r.status_code == 422
 
 
 def test_export_finance_csv(monkeypatch):

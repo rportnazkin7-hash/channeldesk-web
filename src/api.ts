@@ -91,6 +91,6 @@ export const api={
  createTask:(wid:number,p:{title:string;description?:string;priority?:string;assignee_id?:number|null;due_at?:string|null;remind_at?:string|null})=>req<Task>(`/api/workspaces/${wid}/tasks`,{method:'POST',body:JSON.stringify(p)}),
  completeTask:(wid:number,id:number)=>req<Task>(`/api/workspaces/${wid}/tasks/${id}/done`,{method:'POST'}),
  deleteTask:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/tasks/${id}`,{method:'DELETE'}),
-  requestExport:(wid:number,kind:'posts'|'bookings'|'finance',format:'csv'|'xlsx'|'pdf',period?:{year:number;month:number})=>req<{id:number;kind:string;format:string;status:string;message:string}>(`/api/workspaces/${wid}/exports`,{method:'POST',body:JSON.stringify({kind,format,...(period?{period_year:period.year,period_month:period.month}:{})})}),
+  requestExport:(wid:number,kind:'posts'|'bookings'|'finance'|'media_kits',format:'csv'|'xlsx'|'pdf',period?:{year:number;month:number})=>req<{id:number;kind:string;format:string;status:string;message:string}>(`/api/workspaces/${wid}/exports`,{method:'POST',body:JSON.stringify({kind,format,...(period?{period_year:period.year,period_month:period.month}:{})})}),
  exportsStatus:(wid:number)=>req<{id:number;kind:string;format:string;status:string;error_text:string|null;created_at:string;completed_at:string|null}[]>(`/api/workspaces/${wid}/exports`),
 }

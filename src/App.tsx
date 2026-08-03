@@ -3,7 +3,7 @@ import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit,type Task } from './api'
 import Statistics from './Statistics'
 
-const APP_VERSION = 'v0.21.0'
+const APP_VERSION = 'v0.22.0'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
@@ -77,7 +77,7 @@ export default function App(){
  async function completeTask(id:number){buzz();if(!active)return;try{await api.completeTask(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка отметки задачи')}}
  async function delTask(id:number){buzz();if(!active)return;try{await api.deleteTask(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления задачи')}}
  async function doDeleteWorkspace(){if(!active)return;setBusy(true);setError('');try{await api.deleteWorkspace(active.id);setConfirmDelete(false);setShowSettings(false);const s=await api.workspaces();setSpaces(s);setActiveId(s.length?s[0].id:null);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления агентства');setConfirmDelete(false)}finally{setBusy(false)}}
- async function sendExport(kind:'posts'|'bookings'|'finance',format:'csv'|'xlsx'|'pdf',period?:{year:number;month:number}){buzz();if(!active)return;setExportMsg('');try{await api.requestExport(active.id,kind,format,period);const periodText=period?` за ${period.month}.${period.year}`:'';setExportMsg(`Файл ${kind}.${format}${periodText} будет отправлен ботом в Telegram в течение ~30 секунд`);setTimeout(()=>setExportMsg(''),8000);checkExports()}catch(e){setError(e instanceof Error?e.message:'Ошибка экспорта')}}
+ async function sendExport(kind:'posts'|'bookings'|'finance'|'media_kits',format:'csv'|'xlsx'|'pdf',period?:{year:number;month:number}){buzz();if(!active)return;setExportMsg('');try{await api.requestExport(active.id,kind,format,period);const periodText=period?` за ${period.month}.${period.year}`:'';setExportMsg(`Файл ${kind}.${format}${periodText} будет отправлен ботом в Telegram в течение ~30 секунд`);setTimeout(()=>setExportMsg(''),8000);checkExports()}catch(e){setError(e instanceof Error?e.message:'Ошибка экспорта')}}
  async function checkExports(){if(!active)return;try{const j=await api.exportsStatus(active.id);setExportJobs(j)}catch{}}
  useEffect(()=>{const sp=window.Telegram?.WebApp?.initDataUnsafe?.start_param||'';if(sp.startsWith('invite_')){api.acceptInvite(sp.slice('invite_'.length)).then(res=>{setJoined({workspace_name:res.workspace_name,role:res.role});return load()}).catch(e=>{setError(e instanceof Error?e.message:'Ошибка принятия приглашения');return load()})}else{load()}},[])
  async function create(){buzz();try{await api.createWorkspace(name);setName('Моё агентство');await load();setTab('overview')}catch(e){setError(e instanceof Error?e.message:'Ошибка')}}
@@ -422,6 +422,7 @@ export default function App(){
     <input className="field" placeholder="Цена поста, ₽" type="number" value={mkPrice} onChange={e=>setMkPrice(e.target.value)}/>
    </div>
    <button className="primary-btn" onClick={addMediaKit} disabled={!mkName.trim()}><Plus size={17}/> Создать медиакит</button>
+   <button className="icon-btn" onClick={()=>sendExport('media_kits','pdf')} disabled={!mediaKits.length} style={{marginTop:10,width:'100%'}}><Download size={14}/> Отправить медиакиты PDF в Telegram</button>
    <div style={{marginTop:18}}>
     {mediaKits.length===0?<div className="empty"><p>Медиакитов пока нет.</p></div>:mediaKits.map(k=><article key={k.id} style={{padding:'13px 0',borderBottom:'1px solid var(--border)'}}>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>

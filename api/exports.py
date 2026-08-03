@@ -14,7 +14,7 @@ from api.rbac import require_action
 
 router = APIRouter(prefix='/api', tags=['exports'])
 
-EXPORT_KINDS = {'posts', 'bookings', 'finance'}
+EXPORT_KINDS = {'posts', 'bookings', 'finance', 'media_kits'}
 EXPORT_FORMATS = {'csv', 'xlsx', 'pdf'}
 
 
@@ -135,6 +135,65 @@ def finance_pdf(transactions: list[dict]) -> StreamingResponse:
                              headers={'Content-Disposition': 'attachment; filename="finance.pdf"'})
 
 
+def media_kits_pdf(kits: list[dict]) -> StreamingResponse:
+    from fpdf import FPDF
+    fonts = Path(__file__).resolve().parents[1] / 'assets' / 'fonts'
+    pdf = FPDF()
+    pdf.add_font('DejaVu', '', str(fonts / 'DejaVuSans.ttf'))
+    pdf.add_font('DejaVu', 'B', str(fonts / 'DejaVuSans-Bold.ttf'))
+    if not kits:
+        pdf.add_page()
+        pdf.set_font('DejaVu', 'B', 16)
+        pdf.cell(0, 10, 'ChannelDesk - Медиакиты', new_x='LMARGIN', new_y='NEXT')
+        pdf.set_font('DejaVu', '', 10)
+        pdf.cell(0, 7, 'Медиакитов пока нет.', new_x='LMARGIN', new_y='NEXT')
+    for kit in kits:
+        pdf.add_page()
+        pdf.set_font('DejaVu', 'B', 18)
+        pdf.cell(0, 11, kit.get('name') or 'Медиакит', new_x='LMARGIN', new_y='NEXT')
+        pdf.set_font('DejaVu', '', 10)
+        pdf.cell(0, 7, f"Канал: {kit.get('channel_title') or 'не указан'}",
+                 new_x='LMARGIN', new_y='NEXT')
+        pdf.ln(3)
+        if kit.get('description'):
+            pdf.set_font('DejaVu', 'B', 11)
+            pdf.cell(0, 7, 'О канале', new_x='LMARGIN', new_y='NEXT')
+            pdf.set_font('DejaVu', '', 10)
+            pdf.multi_cell(0, 6, str(kit['description']), new_x='LMARGIN', new_y='NEXT')
+        stats = kit.get('stats') or {}
+        if stats:
+            pdf.set_font('DejaVu', 'B', 11)
+            pdf.cell(0, 7, 'Статистика', new_x='LMARGIN', new_y='NEXT')
+            pdf.set_font('DejaVu', '', 10)
+            for key, value in stats.items():
+                pdf.cell(0, 6, f'{key}: {value}', new_x='LMARGIN', new_y='NEXT')
+        pricing = kit.get('pricing') or []
+        if pricing:
+            pdf.set_font('DejaVu', 'B', 11)
+            pdf.cell(0, 7, 'Стоимость размещений', new_x='LMARGIN', new_y='NEXT')
+            pdf.set_font('DejaVu', '', 10)
+            for item in pricing:
+                if isinstance(item, dict):
+                    fmt = item.get('format') or 'размещение'
+                    price = item.get('price', '')
+                    currency = item.get('currency') or 'RUB'
+                    pdf.cell(0, 6, f'{fmt}: {price} {currency}', new_x='LMARGIN', new_y='NEXT')
+                else:
+                    pdf.cell(0, 6, str(item), new_x='LMARGIN', new_y='NEXT')
+        contacts = kit.get('contacts') or {}
+        if contacts:
+            pdf.set_font('DejaVu', 'B', 11)
+            pdf.cell(0, 7, 'Контакты', new_x='LMARGIN', new_y='NEXT')
+            pdf.set_font('DejaVu', '', 10)
+            for key, value in contacts.items():
+                pdf.cell(0, 6, f'{key}: {value}', new_x='LMARGIN', new_y='NEXT')
+    buffer = io.BytesIO()
+    pdf.output(buffer)
+    buffer.seek(0)
+    return StreamingResponse(buffer, media_type='application/pdf',
+                             headers={'Content-Disposition': 'attachment; filename="media-kits.pdf"'})
+
+
 def posts_pdf(posts: list[dict]) -> StreamingResponse:
     from fpdf import FPDF
     fonts = Path(__file__).resolve().parents[1] / 'assets' / 'fonts'
@@ -181,12 +240,15 @@ def list_exports(workspace_id: int, user: dict = Depends(current_user)):
 def create_export_job(workspace_id: int, payload: ExportRequest, user: dict = Depends(current_user)):
     """Создаёт задание на экспорт: файл сгенерирует и отправит бот прямо в Telegram."""
     member = membership(user['id'], workspace_id)
-    action = {'posts': 'post.view', 'bookings': 'booking.view', 'finance': 'finance.view'}.get(payload.kind)
+    action = {'posts': 'post.view', 'bookings': 'booking.view', 'finance': 'finance.view',
+              'media_kits': 'media_kit.view'}.get(payload.kind)
     if action is None:
         raise HTTPException(422, 'Неизвестный тип экспорта')
     require_action(member, action)
     if payload.format not in EXPORT_FORMATS:
         raise HTTPException(422, 'Неизвестный формат')
+    if payload.kind == 'media_kits' and payload.format != 'pdf':
+        raise HTTPException(422, 'Медиакиты экспортируются в PDF')
     if payload.period_year is not None or payload.period_month is not None:
         if payload.kind != 'finance' or payload.period_year is None or payload.period_month is None:
             raise HTTPException(422, 'Период можно указать только для финансового экспорта')
@@ -228,6 +290,14 @@ def _load_transactions(workspace_id: int) -> list[dict]:
         return cur.fetchall()
 
 
+def _load_media_kits(workspace_id: int) -> list[dict]:
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute("""SELECT mk.*, c.title AS channel_title
+        FROM cd_media_kits mk LEFT JOIN cd_channels c ON c.id=mk.channel_id
+        WHERE mk.workspace_id=%s AND mk.is_active=true ORDER BY mk.name""", (workspace_id,))
+        return cur.fetchall()
+
+
 @router.get('/workspaces/{workspace_id}/export/posts')
 def export_posts(workspace_id: int, format: str = 'csv', user: dict = Depends(current_user)):
     member = membership(user['id'], workspace_id)
@@ -258,6 +328,15 @@ def export_finance(workspace_id: int, format: str = 'csv', user: dict = Depends(
     if format == 'pdf':
         return finance_pdf(transactions)
     return finance_csv(transactions)
+
+
+@router.get('/workspaces/{workspace_id}/export/media-kits')
+def export_media_kits(workspace_id: int, format: str = 'pdf', user: dict = Depends(current_user)):
+    member = membership(user['id'], workspace_id)
+    require_action(member, 'media_kit.view')
+    if format != 'pdf':
+        raise HTTPException(422, 'Медиакиты экспортируются в PDF')
+    return media_kits_pdf(_load_media_kits(workspace_id))
 
 
 def _bookings_xlsx(bookings: list[dict]) -> StreamingResponse:
