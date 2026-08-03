@@ -7,9 +7,9 @@ const tg = window.Telegram?.WebApp
 try {
   if (typeof tg?.ready === 'function') tg.ready()
   if (typeof tg?.expand === 'function') tg.expand()
-  if (typeof tg?.setHeaderColor === 'function') tg.setHeaderColor('#090b10')
-  if (typeof tg?.setBackgroundColor === 'function') tg.setBackgroundColor('#090b10')
-  document.title = 'ChannelDesk v0.16.1'
+  if (typeof tg?.setHeaderColor === 'function') tg.setHeaderColor('#0b0d10')
+  if (typeof tg?.setBackgroundColor === 'function') tg.setBackgroundColor('#0b0d10')
+  document.title = 'ChannelDesk v0.17.0'
 } catch {}
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: string | null }> {

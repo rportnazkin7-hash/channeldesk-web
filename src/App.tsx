@@ -2,7 +2,7 @@ import { useCallback,useEffect,useState } from 'react'
 import { BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download } from 'lucide-react'
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit,type Task } from './api'
 
-const APP_VERSION = 'v0.16.1'
+const APP_VERSION = 'v0.17.0'
 type Tab = 'overview'|'calendar'|'create'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
@@ -99,12 +99,12 @@ export default function App(){
 
  function renderPostCard(p:Post){
   const open=openPost===p.id
-  return <article key={p.id} style={{padding:'14px 0',borderBottom:'1px solid #252b36'}}>
+  return <article key={p.id} style={{padding:'14px 0',borderBottom:'1px solid var(--border)'}}>
    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
     <strong style={{fontSize:14}}>{p.title||'(без заголовка)'}</strong>
     <span className={"status status-"+p.status}>{STATUS_LABEL[p.status]||p.status}</span>
    </div>
-   <p style={{color:'#8d96a8',fontSize:12,margin:'6px 0 0'}}>
+   <p style={{color:'var(--muted)',fontSize:12,margin:'6px 0 0'}}>
     {p.channel_title||'без канала'}
     {p.scheduled_at?` · ${fmtDate(p.scheduled_at)}`:''}
     {p.author_username?` · @${p.author_username}`:''}
@@ -118,37 +118,37 @@ export default function App(){
     {p.status==='scheduled'&&canSchedule&&<button onClick={()=>actPost(p.id,'now')} disabled={busy}><Send size={14}/> Опубликовать сейчас</button>}
     {p.status==='failed'&&canSchedule&&<button onClick={()=>actPost(p.id,'now')} disabled={busy}><Send size={14}/> Повторить</button>}
     {p.status==='cancelled'&&canSchedule&&<button onClick={()=>actPost(p.id,'now')} disabled={busy}><Send size={14}/> Возобновить</button>}
-    {p.status==='failed'&&p.last_error&&<p style={{color:'#ff9b9b',fontSize:11,marginTop:8,width:'100%'}}>Причина: {p.last_error}</p>}
+    {p.status==='failed'&&p.last_error&&<p style={{color:'var(--danger)',fontSize:11,marginTop:8,width:'100%'}}>Причина: {p.last_error}</p>}
     {!['published','cancelled','publishing'].includes(p.status)&&<button onClick={()=>actPost(p.id,'cancel')} disabled={busy} style={{opacity:.7}}>Отменить</button>}
     <button onClick={()=>openDetails(p.id)} disabled={busy} style={{opacity:.8}}>{open?'Свернуть':'Подробнее'}</button>
    </div>
-   {open&&<div style={{marginTop:12,padding:12,borderRadius:14,background:'#0d1119',border:'1px solid #222936'}}>
+   {open&&<div style={{marginTop:12,padding:12,borderRadius:14,background:'var(--panel-2)',border:'1px solid var(--border)'}}>
     {(p.status==='draft'||p.status==='in_progress'||p.status==='idea')&&<div style={{marginBottom:12}}>
      <strong style={{fontSize:13}}>Кнопка (URL)</strong>
      <div style={{display:'flex',gap:8,marginTop:8}}>
-      <input placeholder="Текст кнопки" value={btnText} onChange={e=>setBtnText(e.target.value)} style={{flex:1,padding:10,borderRadius:10,border:'1px solid #445',background:'#111722',color:'white',fontSize:13}}/>
-      <input placeholder="https://" value={btnUrl} onChange={e=>setBtnUrl(e.target.value)} style={{flex:1.5,padding:10,borderRadius:10,border:'1px solid #445',background:'#111722',color:'white',fontSize:13}}/>
+      <input placeholder="Текст кнопки" value={btnText} onChange={e=>setBtnText(e.target.value)} style={{flex:1,padding:10,borderRadius:10,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',fontSize:13}}/>
+      <input placeholder="https://" value={btnUrl} onChange={e=>setBtnUrl(e.target.value)} style={{flex:1.5,padding:10,borderRadius:10,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',fontSize:13}}/>
       <button onClick={()=>addButtonTo(p.id)} disabled={busy||!btnText.trim()||!btnUrl.trim()}><Plus size={15}/></button>
      </div>
     </div>}
     <div style={{marginBottom:12}}>
      <strong style={{fontSize:13,display:'flex',alignItems:'center',gap:6}}><Paperclip size={14}/> Вложения ({(assetsByPost[p.id]||[]).length})</strong>
      {(assetsByPost[p.id]||[]).length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:8,marginTop:8}}>
-      {(assetsByPost[p.id]||[]).map(a=>a.file_type.startsWith('image/')?<div key={a.id} style={{position:'relative'}}><img src={a.file_url} alt={a.file_name} style={{width:64,height:64,borderRadius:10,objectFit:'cover',border:'1px solid #2c3455'}}/>{(p.status==='draft'||p.status==='in_progress'||p.status==='idea')&&<button onClick={()=>delAsset(p.id,a.id)} style={{position:'absolute',top:-6,right:-6,background:'#2a1414',border:'1px solid #4a2c2c',color:'#ff9b9b',borderRadius:'50%',width:20,height:20,display:'grid',placeItems:'center',padding:0}}><X size={11}/></button>}</div>:<div key={a.id} style={{display:'flex',alignItems:'center',gap:6,border:'1px solid #2c3455',borderRadius:10,padding:'6px 10px',background:'#1a2130',fontSize:12}}>📎 <a href={a.file_url} target="_blank" rel="noreferrer" style={{color:'#8cb3ff',textDecoration:'none'}}>{a.file_name.length>20?a.file_name.slice(0,20)+'…':a.file_name}</a>{(p.status==='draft'||p.status==='in_progress'||p.status==='idea')&&<button onClick={()=>delAsset(p.id,a.id)} style={{background:'none',border:0,color:'#ff9b9b',padding:0,marginLeft:4}}><X size={12}/></button>}</div>)}
+      {(assetsByPost[p.id]||[]).map(a=>a.file_type.startsWith('image/')?<div key={a.id} style={{position:'relative'}}><img src={a.file_url} alt={a.file_name} style={{width:64,height:64,borderRadius:10,objectFit:'cover',border:'1px solid var(--border-2)'}}/>{(p.status==='draft'||p.status==='in_progress'||p.status==='idea')&&<button onClick={()=>delAsset(p.id,a.id)} style={{position:'absolute',top:-6,right:-6,background:'var(--danger-bg)',border:'1px solid var(--danger-border)',color:'var(--danger)',borderRadius:'50%',width:20,height:20,display:'grid',placeItems:'center',padding:0}}><X size={11}/></button>}</div>:<div key={a.id} style={{display:'flex',alignItems:'center',gap:6,border:'1px solid var(--border-2)',borderRadius:10,padding:'6px 10px',background:'var(--chip-bg)',fontSize:12}}>📎 <a href={a.file_url} target="_blank" rel="noreferrer" style={{color:'var(--accent-2)',textDecoration:'none'}}>{a.file_name.length>20?a.file_name.slice(0,20)+'…':a.file_name}</a>{(p.status==='draft'||p.status==='in_progress'||p.status==='idea')&&<button onClick={()=>delAsset(p.id,a.id)} style={{background:'none',border:0,color:'var(--danger)',padding:0,marginLeft:4}}><X size={12}/></button>}</div>)}
      </div>}
      {(p.status==='draft'||p.status==='in_progress'||p.status==='idea')&&<label className="file-btn" style={{marginTop:8}}><Paperclip size={14}/> Добавить файл<input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" style={{display:'none'}} onChange={e=>{uploadToPost(p.id,e.target.files);e.target.value=''}}/></label>}
     </div>
     <div style={{marginBottom:12}}>
      <strong style={{fontSize:13,display:'flex',alignItems:'center',gap:6}}><MessageSquare size={14}/> Комментарии</strong>
      <div style={{display:'flex',gap:8,marginTop:8}}>
-      <input placeholder="Комментарий…" value={commentText} onChange={e=>setCommentText(e.target.value)} style={{flex:1,padding:10,borderRadius:10,border:'1px solid #445',background:'#111722',color:'white',fontSize:13}}/>
+      <input placeholder="Комментарий…" value={commentText} onChange={e=>setCommentText(e.target.value)} style={{flex:1,padding:10,borderRadius:10,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',fontSize:13}}/>
       <button onClick={()=>addCommentTo(p.id)} disabled={busy||!commentText.trim()}>Отправить</button>
      </div>
-     {(comments[p.id]||[]).length?comments[p.id].map(cm=><div key={cm.id} style={{marginTop:8,fontSize:12}}><span style={{color:'#8cb3ff'}}>{cm.first_name||cm.username||'?'}:</span> {cm.text}<div style={{color:'#5b6475',fontSize:10}}>{fmtDate(cm.created_at)}</div></div>):<p style={{color:'#5b6475',fontSize:12,marginTop:8}}>Комментариев пока нет.</p>}
+     {(comments[p.id]||[]).length?comments[p.id].map(cm=><div key={cm.id} style={{marginTop:8,fontSize:12}}><span style={{color:'var(--accent-2)'}}>{cm.first_name||cm.username||'?'}:</span> {cm.text}<div style={{color:'var(--muted-2)',fontSize:10}}>{fmtDate(cm.created_at)}</div></div>):<p style={{color:'var(--muted-2)',fontSize:12,marginTop:8}}>Комментариев пока нет.</p>}
     </div>
     <div>
      <strong style={{fontSize:13,display:'flex',alignItems:'center',gap:6}}><History size={14}/> Версии</strong>
-     {(versions[p.id]||[]).length?versions[p.id].slice(0,5).map(v=><div key={v.id} style={{marginTop:8,fontSize:12,color:'#aeb6c8'}}><span style={{color:'#5b6475'}}>{fmtDate(v.created_at)}</span> · {v.title||'(без заголовка)'} · {(v.text||'').slice(0,60)}{v.text&&v.text.length>60?'…':''}</div>):<p style={{color:'#5b6475',fontSize:12,marginTop:8}}>Версий пока нет.</p>}
+     {(versions[p.id]||[]).length?versions[p.id].slice(0,5).map(v=><div key={v.id} style={{marginTop:8,fontSize:12,color:'var(--text-2)'}}><span style={{color:'var(--muted-2)'}}>{fmtDate(v.created_at)}</span> · {v.title||'(без заголовка)'} · {(v.text||'').slice(0,60)}{v.text&&v.text.length>60?'…':''}</div>):<p style={{color:'var(--muted-2)',fontSize:12,marginTop:8}}>Версий пока нет.</p>}
     </div>
    </div>}
   </article>
@@ -160,22 +160,22 @@ export default function App(){
   {joined&&<section className="panel ok">✓ Вы присоединились к «{joined.workspace_name}» (роль: {ROLE_LABEL[joined.role]||joined.role})</section>}
   {exportMsg&&<section className="panel ok">{exportMsg} <button className="icon-btn" style={{marginLeft:8}} onClick={()=>{buzz();checkExports()}}>Статус</button></section>}
   {exportJobs.length>0&&<section className="panel" style={{marginTop:8}}><div className="panel-title"><h2>Экспорты</h2><Download size={16}/></div>
-   {exportJobs.map(j=><div key={j.id} style={{padding:'8px 0',borderBottom:'1px solid #222936',fontSize:12,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+   {exportJobs.map(j=><div key={j.id} style={{padding:'8px 0',borderBottom:'1px solid var(--border)',fontSize:12,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
     <span>{j.kind}.{j.format} — <b>{j.status==='done'?'отправлен':j.status==='processing'?'готовится…':j.status==='failed'?'ошибка':j.status}</b></span>
-    {j.status==='failed'&&j.error_text&&<span style={{color:'#ff9b9b'}}>{j.error_text.slice(0,80)}</span>}
+    {j.status==='failed'&&j.error_text&&<span style={{color:'var(--danger)'}}>{j.error_text.slice(0,80)}</span>}
    </div>)}
   </section>}
 
   {tab==='overview'&&<>
-   {!active&&!loading?<section className="hero"><p>Создайте рабочее пространство агентства.</p><input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white',marginBottom:12}}/><button onClick={create}><CirclePlus size={19}/> Создать</button></section>:<>
+   {!active&&!loading?<section className="hero"><p>Создайте рабочее пространство агентства.</p><input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',marginBottom:12}}/><button onClick={create}><CirclePlus size={19}/> Создать</button></section>:<>
     <section className="hero"><span className="eyebrow">{active?.role}</span><p style={{marginTop:8}}>{active?.name}</p><div>{spaces.length>1&&<select value={active?.id} onChange={e=>{buzz();setActive(spaces.find(x=>x.id===Number(e.target.value))||null)}}>{spaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select>}</div></section>
-    {pending.length>0&&<section className="panel" style={{marginTop:16}}><div className="panel-title"><h2>Обнаруженные каналы</h2><Radio size={20}/></div>{pending.map(p=><article key={p.id} style={{padding:'14px 0',borderBottom:'1px solid #252b36'}}><strong>{p.title}</strong><p style={{color:'#8d96a8',fontSize:12}}>{p.bot_permissions.can_post_messages?'Публикация разрешена':'Нет права публикации'}</p><button onClick={()=>connect(p.id)} disabled={!p.bot_permissions.can_post_messages}>Подключить</button></article>)}</section>}
+    {pending.length>0&&<section className="panel" style={{marginTop:16}}><div className="panel-title"><h2>Обнаруженные каналы</h2><Radio size={20}/></div>{pending.map(p=><article key={p.id} style={{padding:'14px 0',borderBottom:'1px solid var(--border)'}}><strong>{p.title}</strong><p style={{color:'var(--muted)',fontSize:12}}>{p.bot_permissions.can_post_messages?'Публикация разрешена':'Нет права публикации'}</p><button onClick={()=>connect(p.id)} disabled={!p.bot_permissions.can_post_messages}>Подключить</button></article>)}</section>}
     <section className="stats"><article><span>Каналы</span><strong>{channels.length}</strong></article><article><span>Запланировано</span><strong>{posts.filter(p=>p.status==='scheduled').length}</strong></article><article><span>На согласовании</span><strong>{posts.filter(p=>p.status==='review').length}</strong></article><article><span>Доход за месяц</span><strong>{finSummary?finSummary.income.toLocaleString('ru-RU'):'0'} ₽</strong></article></section>
-    <section id="channels-section" className="panel"><div className="panel-title"><h2>Каналы</h2><CalendarDays size={20}/></div>{channels.length?channels.map(c=><div key={c.id} style={{padding:'15px 0',borderBottom:'1px solid #252b36'}}><strong>{c.title}</strong><div style={{color:'#72d99f',fontSize:12}}>● подключён</div></div>):<div className="empty"><div className="empty-icon"><Megaphone/></div><h3>Каналов пока нет</h3><p>Добавьте бота администратором канала и обновите экран.</p></div>}</section>
+    <section id="channels-section" className="panel"><div className="panel-title"><h2>Каналы</h2><CalendarDays size={20}/></div>{channels.length?channels.map(c=><div key={c.id} style={{padding:'15px 0',borderBottom:'1px solid var(--border)'}}><strong>{c.title}</strong><div style={{color:'var(--accent-2)',fontSize:12}}>● подключён</div></div>):<div className="empty"><div className="empty-icon"><Megaphone/></div><h3>Каналов пока нет</h3><p>Добавьте бота администратором канала и обновите экран.</p></div>}</section>
     <section id="team-section" className="panel" style={{marginTop:16}}><div className="panel-title"><h2>Команда</h2><Users size={20}/></div>
      {canManage&&<button className="invite-btn" onClick={makeInvite}><Link2 size={15}/> Создать приглашение (редактор)</button>}
      {invite&&<div className="invite-box"><p>Токен приглашения: <code>{invite.token}</code></p><p className="hint">Ссылка для сотрудника: <code>https://t.me/channel_desk_bot?start=invite_{invite.token}</code></p><button onClick={copyInvite}>{copied?'Скопировано':'Скопировать токен'}</button></div>}
-     {members.length?members.map(m=><div key={m.id} style={{padding:'13px 0',borderBottom:'1px solid #252b36',display:'flex',justifyContent:'space-between',alignItems:'center'}}><strong>{m.first_name||m.username||`ID ${m.telegram_id}`}</strong><span style={{color:'#8d96a8',fontSize:12}}>{ROLE_LABEL[m.role]||m.role}</span></div>):<div className="empty"><p>Участников пока нет.</p></div>}
+     {members.length?members.map(m=><div key={m.id} style={{padding:'13px 0',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}><strong>{m.first_name||m.username||`ID ${m.telegram_id}`}</strong><span style={{color:'var(--muted)',fontSize:12}}>{ROLE_LABEL[m.role]||m.role}</span></div>):<div className="empty"><p>Участников пока нет.</p></div>}
     </section>
    </>}
   </>}
@@ -199,12 +199,12 @@ export default function App(){
       <input className="field" placeholder="https://…" value={draftBtnUrl} onChange={e=>setDraftBtnUrl(e.target.value)}/>
       <button className="icon-btn" onClick={addDraftBtn} disabled={!draftBtnText.trim()||!draftBtnUrl.trim()} title="Добавить кнопку"><Plus size={16}/></button>
      </div>
-     {draftBtns.length>0&&<div className="chip-wrap">{draftBtns.map((b,i)=><span key={i} className="btn-chip">🔗 {b.text} <button onClick={()=>{buzz();setDraftBtns(draftBtns.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'#ff9b9b',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
+     {draftBtns.length>0&&<div className="chip-wrap">{draftBtns.map((b,i)=><span key={i} className="btn-chip">🔗 {b.text} <button onClick={()=>{buzz();setDraftBtns(draftBtns.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'var(--danger)',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
      <label className="form-label">Вложения (фото, видео, документы)</label>
      <label className="file-btn"><Paperclip size={15}/> Выбрать файлы<input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" style={{display:'none'}} onChange={e=>pickFiles(e.target.files)}/></label>
-     {draftFiles.length>0&&<div className="chip-wrap">{draftFiles.map((f,i)=><span key={i} className="btn-chip">📎 {f.name.length>22?f.name.slice(0,22)+'…':f.name} <button onClick={()=>{buzz();setDraftFiles(draftFiles.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'#ff9b9b',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
+     {draftFiles.length>0&&<div className="chip-wrap">{draftFiles.map((f,i)=><span key={i} className="btn-chip">📎 {f.name.length>22?f.name.slice(0,22)+'…':f.name} <button onClick={()=>{buzz();setDraftFiles(draftFiles.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'var(--danger)',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
      <button className="primary-btn" onClick={createDraft} disabled={busy||!newTitle.trim()}><CirclePlus size={18}/> Создать черновик {draftFiles.length?`(${draftFiles.length} вл.)`:''}</button>
-     {templates.length>0&&<div style={{marginTop:14}}><span style={{color:'#8d96a8',fontSize:12}}>Шаблоны: </span>{templates.map(t=><button key={t.id} onClick={()=>useTemplate(t)} disabled={busy} className="chip-btn">{t.name}</button>)}</div>}
+     {templates.length>0&&<div style={{marginTop:14}}><span style={{color:'var(--muted)',fontSize:12}}>Шаблоны: </span>{templates.map(t=><button key={t.id} onClick={()=>useTemplate(t)} disabled={busy} className="chip-btn">{t.name}</button>)}</div>}
     </section>
 
     <section className="panel" style={{marginTop:14}}>
@@ -236,16 +236,16 @@ export default function App(){
     <button className="invite-btn" disabled style={{opacity:.5}}><Megaphone size={15}/> Рекламный слот (Этап C)</button>
     <div style={{margin:'18px 0 10px'}}><strong>Сохранить текущий черновик как шаблон</strong></div>
     <div style={{display:'flex',gap:8}}>
-     <input placeholder="Название шаблона" value={newTplName} onChange={e=>setNewTplName(e.target.value)} style={{flex:1,padding:12,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white'}}/>
+     <input placeholder="Название шаблона" value={newTplName} onChange={e=>setNewTplName(e.target.value)} style={{flex:1,padding:12,borderRadius:12,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white'}}/>
      <button onClick={saveTemplate} disabled={busy||!newTplName.trim()||!newText.trim()}>Сохранить</button>
     </div>
-    {templates.length>0&&<div style={{marginTop:14}}>{templates.map(t=><div key={t.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid #222936'}}><div><strong style={{fontSize:14}}>{t.name}</strong><div style={{color:'#8d96a8',fontSize:12}}>{t.title||'(без заголовка)'}</div></div><div style={{display:'flex',gap:6}}><button onClick={()=>useTemplate(t)} disabled={busy} className="icon-btn"><FileText size={15}/></button><button onClick={()=>delTemplate(t.id)} disabled={busy} className="icon-btn danger"><Trash2 size={15}/></button></div></div>)}</div>}
+    {templates.length>0&&<div style={{marginTop:14}}>{templates.map(t=><div key={t.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}><div><strong style={{fontSize:14}}>{t.name}</strong><div style={{color:'var(--muted)',fontSize:12}}>{t.title||'(без заголовка)'}</div></div><div style={{display:'flex',gap:6}}><button onClick={()=>useTemplate(t)} disabled={busy} className="icon-btn"><FileText size={15}/></button><button onClick={()=>delTemplate(t.id)} disabled={busy} className="icon-btn danger"><Trash2 size={15}/></button></div></div>)}</div>}
     <div style={{margin:'18px 0 10px'}}><strong>Новое рабочее пространство</strong></div>
-    <input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white',marginBottom:12}}/>
+    <input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',marginBottom:12}}/>
     <button onClick={create}><CirclePlus size={19}/> Создать пространство</button>
    </>:<>
-    <p style={{color:'#8d96a8',fontSize:14}}>Создайте рабочее пространство, чтобы начать работу.</p>
-    <input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid #445',background:'#111722',color:'white',marginBottom:12}}/>
+    <p style={{color:'var(--muted)',fontSize:14}}>Создайте рабочее пространство, чтобы начать работу.</p>
+    <input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',marginBottom:12}}/>
     <button onClick={create}><CirclePlus size={19}/> Создать</button>
    </>}
   </section>}
@@ -258,8 +258,8 @@ export default function App(){
      </div>
      {finSummary&&<div className="fin-cards">
       <div><span>Доход</span><strong>{finSummary.income.toLocaleString('ru-RU')} ₽</strong></div>
-      <div><span>Расход</span><strong style={{color:'#ff9b9b'}}>{finSummary.expense.toLocaleString('ru-RU')} ₽</strong></div>
-      <div><span>Прибыль</span><strong style={{color:'#72d99f'}}>{finSummary.profit.toLocaleString('ru-RU')} ₽</strong></div>
+      <div><span>Расход</span><strong style={{color:'var(--danger)'}}>{finSummary.expense.toLocaleString('ru-RU')} ₽</strong></div>
+      <div><span>Прибыль</span><strong style={{color:'var(--accent-2)'}}>{finSummary.profit.toLocaleString('ru-RU')} ₽</strong></div>
      </div>}
      <div className="btn-row" style={{marginTop:14}}>
       <button className="icon-btn" onClick={()=>sendExport(adsTab==='finance'?'finance':'bookings','csv')} title="Экспорт CSV"><Download size={15}/> CSV</button>
@@ -284,7 +284,7 @@ export default function App(){
       <input className="field" placeholder="Дата (ГГГГ-ММ-ДД)" type="date" value={bkDate} onChange={e=>setBkDate(e.target.value)}/>
      </div>
      <label className="form-label" style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}}>
-      <input type="checkbox" checked={bkNoErid} onChange={e=>setBkNoErid(e.target.checked)} style={{width:18,height:18,accentColor:'#8cb3ff'}}/>
+      <input type="checkbox" checked={bkNoErid} onChange={e=>setBkNoErid(e.target.checked)} style={{width:18,height:18,accentColor:'var(--accent-2)'}}/>
       <span>ERID не требуется (обычный Telegram-канал)</span>
      </label>
      {!bkNoErid&&<>
@@ -293,17 +293,17 @@ export default function App(){
      </>}
      <button className="primary-btn" onClick={addBooking} disabled={!bkAdv}><Megaphone size={17}/> Создать бронь</button>
      <div className="panel-title" style={{marginTop:20}}><h3 className="list-h">Бронирования</h3></div>
-     {bookings.length===0?<div className="empty"><p>Броней пока нет.</p></div>:bookings.map(b=><article key={b.id} style={{padding:'13px 0',borderBottom:'1px solid #222936'}}>
+     {bookings.length===0?<div className="empty"><p>Броней пока нет.</p></div>:bookings.map(b=><article key={b.id} style={{padding:'13px 0',borderBottom:'1px solid var(--border)'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
        <strong style={{fontSize:14}}>{b.advertiser_name||`#${b.advertiser_id}`}</strong>
        <span className={"status status-"+b.status}>{BOOKING_STATUS_LABEL[b.status]||b.status}</span>
       </div>
-      <p style={{color:'#8d96a8',fontSize:12,margin:'6px 0 0'}}>
+      <p style={{color:'var(--muted)',fontSize:12,margin:'6px 0 0'}}>
        {FORMAT_LABEL[b.format]||b.format} · {b.cost.toLocaleString('ru-RU')} {b.currency}
        {b.channel_title?` · ${b.channel_title}`:''}
        {b.publish_at?` · ${fmtDate(b.publish_at)}`:''}
       </p>
-      {!b.erid_required?<span className="no-erid-badge">без ERID</span>:b.erid?<p style={{color:'#5b6475',fontSize:11,margin:'4px 0 0'}}>{b.erid}</p>:<span className="no-erid-badge warn">ERID не указан</span>}
+      {!b.erid_required?<span className="no-erid-badge">без ERID</span>:b.erid?<p style={{color:'var(--muted-2)',fontSize:11,margin:'4px 0 0'}}>{b.erid}</p>:<span className="no-erid-badge warn">ERID не указан</span>}
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10,alignItems:'center'}}>
        <span className={"status "+(b.payment_status==='paid'?'status-published':b.payment_status==='partially_paid'?'status-review':'status-cancelled')}>{PAYMENT_LABEL[b.payment_status]||b.payment_status}</span>
        {b.payment_status!=='paid'&&<button onClick={()=>payBooking(b.id)} disabled={busy}>✓ Оплачено</button>}
@@ -318,8 +318,8 @@ export default function App(){
      <input className="field" placeholder="Контакты (телефон, @telegram, email…)" value={advContact} onChange={e=>setAdvContact(e.target.value)} style={{marginTop:10}}/>
      <button className="primary-btn" onClick={addAdvertiser} disabled={!advName.trim()}><Plus size={17}/> Добавить рекламодателя</button>
      <div className="panel-title" style={{marginTop:20}}><h3 className="list-h">Рекламодатели</h3></div>
-     {advertisers.length===0?<div className="empty"><p>Рекламодателей пока нет.</p></div>:advertisers.map(a=><div key={a.id} style={{padding:'13px 0',borderBottom:'1px solid #222936',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-      <div><strong style={{fontSize:14}}>{a.name}</strong>{a.notes&&<div style={{color:'#8d96a8',fontSize:12}}>{a.notes}</div>}</div>
+     {advertisers.length===0?<div className="empty"><p>Рекламодателей пока нет.</p></div>:advertisers.map(a=><div key={a.id} style={{padding:'13px 0',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+      <div><strong style={{fontSize:14}}>{a.name}</strong>{a.notes&&<div style={{color:'var(--muted)',fontSize:12}}>{a.notes}</div>}</div>
       <button onClick={()=>delAdvertiser(a.id)} disabled={busy} className="icon-btn danger" title="Удалить"><Trash2 size={14}/></button>
      </div>)}
     </section>}
@@ -334,7 +334,7 @@ export default function App(){
      </div>
      <input className="field" placeholder="Описание" value={finDesc} onChange={e=>setFinDesc(e.target.value)} style={{marginTop:10}}/>
      <button className="primary-btn" onClick={addFinance} disabled={!Number(finAmount)}><Plus size={17}/> Добавить</button>
-     {finSummary&&<p style={{color:'#8d96a8',fontSize:13,marginTop:16,textAlign:'center'}}>Итог за {MONTHS[finSummary.month-1]}: доход {finSummary.income.toLocaleString('ru-RU')} ₽ · расход {finSummary.expense.toLocaleString('ru-RU')} ₽ · прибыль {finSummary.profit.toLocaleString('ru-RU')} ₽</p>}
+     {finSummary&&<p style={{color:'var(--muted)',fontSize:13,marginTop:16,textAlign:'center'}}>Итог за {MONTHS[finSummary.month-1]}: доход {finSummary.income.toLocaleString('ru-RU')} ₽ · расход {finSummary.expense.toLocaleString('ru-RU')} ₽ · прибыль {finSummary.profit.toLocaleString('ru-RU')} ₽</p>}
     </section>}
    </>}
   </>}
@@ -353,13 +353,13 @@ export default function App(){
    </div>
    <button className="primary-btn" onClick={addTask} disabled={!taskTitle.trim()}><Plus size={17}/> Создать задачу</button>
    <div style={{marginTop:18}}>
-    {tasks.length===0?<div className="empty"><p>Задач пока нет.</p></div>:tasks.map(tk=><article key={tk.id} style={{padding:'13px 0',borderBottom:'1px solid #222936'}}>
+    {tasks.length===0?<div className="empty"><p>Задач пока нет.</p></div>:tasks.map(tk=><article key={tk.id} style={{padding:'13px 0',borderBottom:'1px solid var(--border)'}}>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
       <strong style={{fontSize:14,textDecoration:tk.status==='done'?'line-through':'none',opacity:tk.status==='done'?.6:1}}>{tk.title}</strong>
       <span className={"status "+(tk.status==='done'?'status-published':tk.priority==='urgent'||tk.priority==='high'?'status-changes_requested':'status-scheduled')}>{tk.status==='done'?'Готово':tk.priority==='urgent'?'Срочно':tk.priority==='high'?'Высокий':'Обычный'}</span>
      </div>
-     {tk.description&&<p style={{color:'#8d96a8',fontSize:12,margin:'6px 0 0'}}>{tk.description}</p>}
-     <p style={{color:'#5b6475',fontSize:11,margin:'4px 0 0'}}>
+     {tk.description&&<p style={{color:'var(--muted)',fontSize:12,margin:'6px 0 0'}}>{tk.description}</p>}
+     <p style={{color:'var(--muted-2)',fontSize:11,margin:'4px 0 0'}}>
       {tk.due_at?`Срок: ${fmtDate(tk.due_at)}`:''}
       {tk.assignee_first_name?` · Исполнитель: ${tk.assignee_first_name}`:''}
      </p>
@@ -389,17 +389,17 @@ export default function App(){
    </div>
    <button className="primary-btn" onClick={addMediaKit} disabled={!mkName.trim()}><Plus size={17}/> Создать медиакит</button>
    <div style={{marginTop:18}}>
-    {mediaKits.length===0?<div className="empty"><p>Медиакитов пока нет.</p></div>:mediaKits.map(k=><article key={k.id} style={{padding:'13px 0',borderBottom:'1px solid #222936'}}>
+    {mediaKits.length===0?<div className="empty"><p>Медиакитов пока нет.</p></div>:mediaKits.map(k=><article key={k.id} style={{padding:'13px 0',borderBottom:'1px solid var(--border)'}}>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
       <strong style={{fontSize:14}}>{k.name}</strong>
       <button onClick={()=>delMediaKit(k.id)} disabled={busy} className="icon-btn danger" title="Удалить"><Trash2 size={14}/></button>
      </div>
-     <p style={{color:'#8d96a8',fontSize:12,margin:'6px 0 0'}}>
+     <p style={{color:'var(--muted)',fontSize:12,margin:'6px 0 0'}}>
       {k.channel_title||'без канала'}
       {k.stats&&typeof k.stats==='object'&&'subscribers' in k.stats&&(k.stats as Record<string,number>).subscribers?` · ${Number((k.stats as Record<string,number>).subscribers).toLocaleString('ru-RU')} подписчиков`:''}
      </p>
-     {k.description&&<p style={{fontSize:13,margin:'6px 0 0',color:'#aeb6c8'}}>{k.description}</p>}
-     {Array.isArray(k.pricing)&&k.pricing.length>0&&<p style={{color:'#72d99f',fontSize:12,margin:'6px 0 0'}}>{(k.pricing[0] as {format?:string;price?:number}).format||'пост'}: {(k.pricing[0] as {price?:number}).price?.toLocaleString('ru-RU')} ₽</p>}
+     {k.description&&<p style={{fontSize:13,margin:'6px 0 0',color:'var(--text-2)'}}>{k.description}</p>}
+     {Array.isArray(k.pricing)&&k.pricing.length>0&&<p style={{color:'var(--accent-2)',fontSize:12,margin:'6px 0 0'}}>{(k.pricing[0] as {format?:string;price?:number}).format||'пост'}: {(k.pricing[0] as {price?:number}).price?.toLocaleString('ru-RU')} ₽</p>}
     </article>)}
    </div>
   </section>}
