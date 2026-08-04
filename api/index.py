@@ -34,7 +34,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title='ChannelDesk API', version='0.28.0', lifespan=lifespan)
+app = FastAPI(title='ChannelDesk API', version='0.29.0', lifespan=lifespan)
 origins=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
 app.add_middleware(CORSMiddleware,allow_origins=origins,allow_credentials=False,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Content-Type','X-Telegram-Init-Data','X-Dev-Api-Key'])
 app.include_router(workspaces_router)
@@ -50,7 +50,7 @@ app.include_router(exports_router)
 
 @app.get('/api/health')
 def health():
-    return {'ok': True, 'service': 'ChannelDesk API', 'version': '0.28.0'}
+    return {'ok': True, 'service': 'ChannelDesk API', 'version': '0.29.0'}
 
 
 @app.get('/api/health/db-hash')
@@ -63,6 +63,7 @@ def health_db_hash():
         return {'hash': hashlib.sha256(raw.encode()).hexdigest()[:10], 'host': raw.split('@')[-1]}
     except Exception as exc:
         return {'error': str(exc)}
+@app.get('/api/health/migrations')
 def health_migrations():
     """Список применённых миграций из schema_migrations (через БД — работает)."""
     try:
@@ -72,6 +73,7 @@ def health_migrations():
             return {'ok': True, 'migrations': cur.fetchall()}
     except Exception as exc:
         return {'ok': False, 'error': str(exc)}
+@app.get('/api/health/storage')
 def health_storage():
     """Диагностика хранилища (прямая загрузка из браузера).
 
