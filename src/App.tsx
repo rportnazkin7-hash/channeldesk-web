@@ -46,7 +46,7 @@ export default function App(){
  const [templates,setTemplates]=useState<Template[]>([]),[newTplName,setNewTplName]=useState(''),[btnText,setBtnText]=useState(''),[btnUrl,setBtnUrl]=useState('')
  const [advertisers,setAdvertisers]=useState<Advertiser[]>([]),[bookings,setBookings]=useState<Booking[]>([]),[finSummary,setFinSummary]=useState<FinanceSummary|null>(null)
  const [advName,setAdvName]=useState(''),[advContact,setAdvContact]=useState('')
- const [reportUrl,setReportUrl]=useState(''),[reportBusy,setReportBusy]=useState(false)
+ const [reportUrl,setReportUrl]=useState(''),[reportExpires,setReportExpires]=useState(''),[reportBusy,setReportBusy]=useState(false)
  const [bkAdv,setBkAdv]=useState<number|null>(null),[bkChannel,setBkChannel]=useState<number|null>(null),[bkCost,setBkCost]=useState(''),[bkDate,setBkDate]=useState(''),[bkTime,setBkTime]=useState('12:00'),[bkErid,setBkErid]=useState(''),[bkNoErid,setBkNoErid]=useState(false)
  const [mediaKits,setMediaKits]=useState<MediaKit[]>([])
  const [showMediaKits,setShowMediaKits]=useState(false)
@@ -75,7 +75,8 @@ export default function App(){
  async function saveWorkspaceSettings(){if(!active)return;setSavingSettings(true);setError('');try{const result=await api.updateWorkspaceSettings(active.id,{overdue_cancel_days:Math.max(1,Math.min(30,Number(overdueCancelDays)||3))});setOverdueCancelDays(result.overdue_cancel_days)}catch(e){setError(e instanceof Error?e.message:'Ошибка сохранения настроек')}finally{setSavingSettings(false)}}
  async function addAdvertiser(){buzz();if(!active)return;setError('');try{await api.createAdvertiser(active.id,{name:advName,notes:advContact});setAdvName('');setAdvContact('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления рекламодателя')}}
  async function delAdvertiser(id:number){buzz();if(!active)return;try{await api.deleteAdvertiser(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления рекламодателя')}}
- async function createAdvertiserReport(id:number){buzz();if(!active)return;setReportBusy(true);setError('');try{const r=await api.createPublicReport(active.id,id,30);const full=`${window.location.origin}${r.path}`;setReportUrl(full);try{await navigator.clipboard.writeText(full)}catch{void 0}}catch(e){setError(e instanceof Error?e.message:'Ошибка создания публичного отчёта')}finally{setReportBusy(false)}}
+ async function createAdvertiserReport(id:number){buzz();if(!active)return;setReportBusy(true);setError('');try{const r=await api.createPublicReport(active.id,id,30);const full=`${window.location.origin}${r.path}`;setReportUrl(full);setReportExpires(r.expires_at);try{await navigator.clipboard.writeText(full)}catch{void 0}}catch(e){setError(e instanceof Error?e.message:'Ошибка создания публичного отчёта')}finally{setReportBusy(false)}}
+ async function revokeAdvertiserReport(id:number){buzz();if(!active)return;setReportBusy(true);setError('');try{await api.revokePublicReport(active.id,id);setReportUrl('');setReportExpires('')}catch(e){setError(e instanceof Error?e.message:'Ошибка отзыва публичного отчёта')}finally{setReportBusy(false)}}
  async function addBooking(){buzz();if(!active)return;setError('');try{await api.createBooking(active.id,{advertiser_id:bkAdv??0,cost:Number(bkCost)||0,channel_id:bkChannel,publish_at:bkDate?new Date(`${bkDate}T${bkTime||'12:00'}`).toISOString():null,delete_at:bkDate&&bkTime?new Date(new Date(`${bkDate}T${bkTime||'12:00'}`).getTime()+7*86400000).toISOString():null,erid:bkNoErid?null:(bkErid||null),erid_required:!bkNoErid});setBkAdv(null);setBkCost('');setBkDate('');setBkTime('12:00');setBkErid('');setBkNoErid(false);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания брони')}}
  async function payBooking(id:number){buzz();if(!active)return;try{await api.payBooking(active.id,id,'paid');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка отметки оплаты')}}
  async function delBooking(id:number){buzz();if(!active)return;try{await api.deleteBooking(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления брони')}}
@@ -270,10 +271,10 @@ export default function App(){
 
     <section className="panel" style={{marginTop:14}}>
      <div className="panel-title"><h2>Рекламодатели</h2><Users size={20}/></div>
-     {reportUrl&&<div className="invite-box" style={{marginTop:10}}><p>Ссылка публичного отчёта скопирована:</p><code>{reportUrl}</code></div>}
+     {reportUrl&&<div className="invite-box" style={{marginTop:10}}><p>Ссылка публичного отчёта скопирована.</p><p className="hint">Действует до {fmtDate(reportExpires)}</p><code>{reportUrl}</code></div>}
      {advertisers.length===0?<div className="empty"><p>Рекламодателей пока нет. Добавьте через кнопку «+» внизу.</p></div>:advertisers.map(a=><div key={a.id} style={{padding:'12px 0',borderBottom:'1px solid var(--border)'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><div><strong style={{fontSize:14}}>{a.name}</strong>{a.notes&&<div style={{color:'var(--muted)',fontSize:12}}>{a.notes}</div>}</div><span className="no-erid-badge" style={{marginTop:0}}>{bookings.filter(b=>b.advertiser_id===a.id).length} броней</span></div>
-      {canAdvertiserManage&&<button className="icon-btn" style={{marginTop:9,width:'100%'}} onClick={()=>void createAdvertiserReport(a.id)} disabled={reportBusy}><Link2 size={14}/> {reportBusy?'Создаю ссылку…':'Создать публичный отчёт'}</button>}
+      {canAdvertiserManage&&<><button className="icon-btn" style={{marginTop:9,width:'100%'}} onClick={()=>void createAdvertiserReport(a.id)} disabled={reportBusy}><Link2 size={14}/> {reportBusy?'Создаю ссылку…':'Создать публичный отчёт'}</button><button className="icon-btn danger" style={{marginTop:6,width:'100%'}} onClick={()=>void revokeAdvertiserReport(a.id)} disabled={reportBusy}>Отозвать все публичные ссылки</button></>}
      </div>)}
     </section>
 
