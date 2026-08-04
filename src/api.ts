@@ -4,6 +4,7 @@ async function req<T>(path:string,options:RequestInit={}):Promise<T>{
  try{
   const r=await fetch(path,{...options,headers:headers(),signal:ctrl.signal})
   if(!r.ok){let m=`Ошибка ${r.status}`;try{const j=await r.json();m=j.detail||m}catch{}throw new Error(m)}
+  if(r.status===204)return undefined as T
   return r.json()
  }catch(e){
   if(e instanceof DOMException&&e.name==='AbortError')throw new Error('Сервер не ответил за 12 секунд. Проверьте интернет и обновите экран.')
