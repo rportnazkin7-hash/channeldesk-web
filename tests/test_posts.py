@@ -237,6 +237,16 @@ def test_create_post_button_without_url_rejected(monkeypatch):
     assert 'url' in r.json()['detail'].lower()
 
 
+def test_create_post_button_invalid_url_rejected(monkeypatch):
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER])
+    monkeypatch.setattr('api.posts.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/posts',
+                    json={'title': 'x', 'text': 'y', 'buttons': [[{'text': 'Бот', 'url': '@channel_desk_bot'}]]},
+                    headers=auth_headers())
+    assert r.status_code == 422
+    assert 'https://' in r.json()['detail']
+
+
 def test_templates_crud(monkeypatch):
     template = {'id': 1, 'workspace_id': 3, 'name': 'Анонс', 'title': 'Заголовок', 'text': 'Текст анонса'}
     conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, template])

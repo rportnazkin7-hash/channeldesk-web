@@ -2,6 +2,7 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from api.auth import current_user
@@ -90,6 +91,9 @@ def _normalize_buttons(buttons) -> list:
                 raise HTTPException(422, 'У кнопки нет текста')
             if not url:
                 raise HTTPException(422, 'У кнопки нет url — в каналах доступны только URL-кнопки')
+            parsed = urlparse(url)
+            if parsed.scheme not in {'http', 'https', 'tg'} or (parsed.scheme != 'tg' and not parsed.netloc):
+                raise HTTPException(422, 'URL кнопки должен начинаться с https://, http:// или tg://')
             row_out.append({'text': text, 'url': url})
         out.append(row_out)
     return out
