@@ -137,6 +137,7 @@ export default function App(){
    <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10,alignItems:'center'}}>
     <span className={"status "+(b.payment_status==='paid'?'status-published':b.payment_status==='partially_paid'?'status-review':'status-cancelled')}>{PAYMENT_LABEL[b.payment_status]||b.payment_status}</span>
     {b.payment_status!=='paid'&&!['done','cancelled'].includes(b.status)&&<button onClick={()=>payBooking(b.id)} disabled={busy}>✓ Оплачено</button>}
+    {b.status==='active'&&canAdvertiserManage&&<button className="icon-btn danger" onClick={()=>{if(window.confirm('Удалить активное размещение из ChannelDesk?'))void delBooking(b.id)}} disabled={busy}>Удалить размещение</button>}
    </div>
   </article>
  }
