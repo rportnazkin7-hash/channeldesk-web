@@ -1,6 +1,6 @@
 from __future__ import annotations
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -156,6 +156,34 @@ def _validate_booking(cur, workspace_id: int, payload) -> None:
             raise HTTPException(422, 'Публикация не принадлежит этому рабочему пространству')
 
 
+def _validate_schedule_conflict(cur, workspace_id: int, channel_id: int | None,
+                                publish_at: datetime | None, delete_at: datetime | None,
+                                booking_id: int | None = None) -> None:
+    if channel_id is None or publish_at is None:
+        return
+    end_at = delete_at or (publish_at + timedelta(days=7))
+    if end_at <= publish_at:
+        raise HTTPException(422, 'Дата окончания размещения должна быть позже даты начала')
+    sql = """SELECT b.id,b.publish_at,b.delete_at,a.name AS advertiser_name
+             FROM cd_ad_bookings b
+             LEFT JOIN cd_advertisers a ON a.id=b.advertiser_id
+             WHERE b.workspace_id=%s AND b.channel_id=%s
+               AND b.status NOT IN ('cancelled','done','overdue')
+               AND b.publish_at IS NOT NULL
+               AND b.publish_at < %s
+               AND COALESCE(b.delete_at,b.publish_at + interval '7 days') > %s"""
+    params: list = [workspace_id, channel_id, end_at, publish_at]
+    if booking_id is not None:
+        sql += ' AND b.id<>%s'
+        params.append(booking_id)
+    sql += ' LIMIT 1'
+    cur.execute(sql, params)
+    conflict = cur.fetchone()
+    if conflict:
+        name = conflict.get('advertiser_name') or f"бронь #{conflict['id']}"
+        raise HTTPException(409, f'Канал уже занят размещением «{name}» в выбранный период')
+
+
 @router.get('/workspaces/{workspace_id}/bookings')
 def list_bookings(workspace_id: int, status: str | None = None, user: dict = Depends(current_user)):
     member = membership(user['id'], workspace_id)
@@ -187,6 +215,7 @@ def create_booking(workspace_id: int, payload: BookingCreate, user: dict = Depen
         raise HTTPException(422, 'Неизвестный статус оплаты')
     with connect() as conn, conn.cursor() as cur:
         _validate_booking(cur, workspace_id, payload)
+        _validate_schedule_conflict(cur, workspace_id, payload.channel_id, payload.publish_at, payload.delete_at)
         cur.execute("""INSERT INTO cd_ad_bookings(workspace_id,advertiser_id,channel_id,post_id,format,cost,currency,
         status,payment_status,publish_at,delete_at,erid,erid_required,requisites,materials_url,created_by)
         VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s) RETURNING *""",
@@ -232,6 +261,16 @@ def update_booking(workspace_id: int, booking_id: int, payload: BookingUpdate,
         raise HTTPException(422, 'Нет данных для обновления')
     with connect() as conn, conn.cursor() as cur:
         _validate_booking(cur, workspace_id, payload)
+        if any(key in data for key in ('channel_id', 'publish_at', 'delete_at')):
+            cur.execute('SELECT channel_id,publish_at,delete_at FROM cd_ad_bookings WHERE id=%s AND workspace_id=%s',
+                        (booking_id, workspace_id))
+            existing = cur.fetchone()
+            if not existing:
+                raise HTTPException(404, 'Бронь не найдена')
+            _validate_schedule_conflict(
+                cur, workspace_id, data.get('channel_id', existing.get('channel_id')),
+                data.get('publish_at', existing.get('publish_at')),
+                data.get('delete_at', existing.get('delete_at')), booking_id)
         fields, values = [], []
         for key in ('advertiser_id', 'channel_id', 'post_id', 'format', 'cost', 'currency', 'status',
                     'payment_status', 'publish_at', 'delete_at', 'erid', 'erid_required', 'materials_url', 'report_url'):

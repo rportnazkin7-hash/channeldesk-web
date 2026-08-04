@@ -68,6 +68,32 @@ def test_create_booking(monkeypatch):
     assert r.json()['advertiser_id'] == 1
 
 
+def test_create_booking_rejects_overlapping_channel_slot(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    start = datetime.now(timezone.utc) + timedelta(days=1)
+    conflict = dict(BOOKING_ROW, id=44, status='confirmed', publish_at=start, delete_at=start + timedelta(days=7))
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, {'id': 1}, {'id': 9}, conflict])
+    monkeypatch.setattr('api.ads.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/bookings', json={
+        'advertiser_id': 1, 'channel_id': 9, 'cost': 1000, 'publish_at': start.isoformat(),
+    }, headers=auth_headers())
+    assert r.status_code == 409
+    assert 'занят' in r.json()['detail']
+
+
+def test_create_booking_rejects_invalid_period(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    start = datetime.now(timezone.utc) + timedelta(days=1)
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, {'id': 1}, {'id': 9}])
+    monkeypatch.setattr('api.ads.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/bookings', json={
+        'advertiser_id': 1, 'channel_id': 9, 'cost': 1000,
+        'publish_at': start.isoformat(), 'delete_at': (start - timedelta(hours=1)).isoformat(),
+    }, headers=auth_headers())
+    assert r.status_code == 422
+    assert 'окончания' in r.json()['detail']
+
+
 def test_create_booking_invalid_advertiser(monkeypatch):
     conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, None])
     monkeypatch.setattr('api.ads.connect', lambda: conn)
@@ -231,7 +257,7 @@ def test_create_booking_creates_scheduled_post(monkeypatch):
                    'delete_at': None, 'erid': 'erid:1', 'erid_required': True, 'requisites': {},
                    'materials_url': None, 'created_by': 1}
     post_row = {'id': 77}
-    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, {'id': 1}, {'id': 9}, booking_row, {'name': 'ООО Реклама'}, post_row])
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, {'id': 1}, {'id': 9}, None, booking_row, {'name': 'ООО Реклама'}, post_row])
     monkeypatch.setattr('api.ads.connect', lambda: conn)
     r = client.post('/api/workspaces/3/bookings',
                     json={'advertiser_id': 1, 'channel_id': 9, 'cost': 5000,
