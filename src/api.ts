@@ -69,6 +69,7 @@ export const api={
  schedulePost:(wid:number,id:number,at:string)=>req<Post>(`/api/workspaces/${wid}/posts/${id}/schedule`,{method:'POST',body:JSON.stringify({scheduled_at:at})}),
  publishNow:(wid:number,id:number)=>req<Post>(`/api/workspaces/${wid}/posts/${id}/publish-now`,{method:'POST'}),
  deletePostFromTelegram:(wid:number,id:number)=>req<{id:number;status:string;message:string}>(`/api/workspaces/${wid}/posts/${id}/delete-from-telegram`,{method:'POST'}),
+ deletePostFromTelegramStatus:(wid:number,id:number)=>req<{id:number|null;status:'none'|'pending'|'processing'|'done'|'failed';error_text:string|null;created_at:string|null;completed_at:string|null}>(`/api/workspaces/${wid}/posts/${id}/delete-from-telegram`),
  cancelPost:(wid:number,id:number)=>req<Post>(`/api/workspaces/${wid}/posts/${id}/cancel`,{method:'POST'}),
  comments:(wid:number,id:number)=>req<Comment[]>(`/api/workspaces/${wid}/posts/${id}/comments`),
  addComment:(wid:number,id:number,text:string)=>req<Comment>(`/api/workspaces/${wid}/posts/${id}/comments`,{method:'POST',body:JSON.stringify({text})}),

@@ -141,6 +141,15 @@ def test_request_delete_from_telegram(monkeypatch):
     assert 'cd_telegram_delete_jobs' in sql
 
 
+def test_delete_from_telegram_status(monkeypatch):
+    job = {'id': 7, 'status': 'processing', 'error_text': None, 'created_at': None, 'completed_at': None}
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, POST_ROW, job])
+    monkeypatch.setattr('api.posts.connect', lambda: conn)
+    r = client.get('/api/workspaces/3/posts/10/delete-from-telegram', headers=auth_headers())
+    assert r.status_code == 200
+    assert r.json()['status'] == 'processing'
+
+
 def test_schedule_requires_channel(monkeypatch):
     no_channel = dict(POST_ROW, channel_id=None, status='approved')
     conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, no_channel])

@@ -331,6 +331,19 @@ def request_delete_from_telegram(workspace_id: int, post_id: int, user: dict = D
     return {'id': job['id'], 'status': job['status'], 'message': 'Удаление будет выполнено ботом в ближайшем цикле'}
 
 
+@router.get('/workspaces/{workspace_id}/posts/{post_id}/delete-from-telegram')
+def delete_from_telegram_status(workspace_id: int, post_id: int, user: dict = Depends(current_user)):
+    member = membership(user['id'], workspace_id)
+    require_action(member, 'post.view')
+    with connect() as conn, conn.cursor() as cur:
+        _get_post(cur, workspace_id, post_id)
+        cur.execute("""SELECT id,status,error_text,created_at,completed_at
+        FROM cd_telegram_delete_jobs WHERE workspace_id=%s AND post_id=%s
+        ORDER BY created_at DESC LIMIT 1""", (workspace_id, post_id))
+        job = cur.fetchone()
+    return job or {'id': None, 'status': 'none', 'error_text': None, 'created_at': None, 'completed_at': None}
+
+
 @router.get('/workspaces/{workspace_id}/posts/{post_id}/versions')
 def post_versions(workspace_id: int, post_id: int, user: dict = Depends(current_user)):
     member = membership(user['id'], workspace_id)
