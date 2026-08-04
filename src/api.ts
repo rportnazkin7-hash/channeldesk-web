@@ -81,6 +81,8 @@ export const api={
  advertisers:(wid:number)=>req<Advertiser[]>(`/api/workspaces/${wid}/advertisers`),
  createAdvertiser:(wid:number,p:{name:string;contact?:Record<string,string>;notes?:string})=>req<Advertiser>(`/api/workspaces/${wid}/advertisers`,{method:'POST',body:JSON.stringify(p)}),
  deleteAdvertiser:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/advertisers/${id}`,{method:'DELETE'}),
+ createPublicReport:(wid:number,advertiserId:number,expiresInDays=30)=>req<{id:number;advertiser_name:string;path:string;expires_at:string}>(`/api/workspaces/${wid}/advertisers/${advertiserId}/public-report`,{method:'POST',body:JSON.stringify({expires_in_days:expiresInDays})}),
+ revokePublicReport:(wid:number,advertiserId:number)=>req<void>(`/api/workspaces/${wid}/advertisers/${advertiserId}/public-report`,{method:'DELETE'}),
  bookings:(wid:number,status?:string)=>req<Booking[]>(`/api/workspaces/${wid}/bookings${status?`?status=${status}`:''}`),
  createBooking:(wid:number,p:{advertiser_id:number;channel_id?:number|null;format?:string;cost:number;currency?:string;publish_at?:string|null;delete_at?:string|null;erid?:string|null;erid_required?:boolean;materials_url?:string|null})=>req<Booking>(`/api/workspaces/${wid}/bookings`,{method:'POST',body:JSON.stringify(p)}),
  updateBooking:(wid:number,id:number,p:Record<string,unknown>)=>req<Booking>(`/api/workspaces/${wid}/bookings/${id}`,{method:'PATCH',body:JSON.stringify(p)}),

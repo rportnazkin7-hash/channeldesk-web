@@ -12,6 +12,7 @@ from api.ads import router as ads_router
 from api.media_kits import router as media_kits_router
 from api.tasks import router as tasks_router
 from api.analytics import router as analytics_router
+from api.reports import router as reports_router
 from api.exports import router as exports_router
 
 
@@ -33,7 +34,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title='ChannelDesk API', version='0.27.0', lifespan=lifespan)
+app = FastAPI(title='ChannelDesk API', version='0.28.0', lifespan=lifespan)
 origins=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
 app.add_middleware(CORSMiddleware,allow_origins=origins,allow_credentials=False,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Content-Type','X-Telegram-Init-Data','X-Dev-Api-Key'])
 app.include_router(workspaces_router)
@@ -44,11 +45,12 @@ app.include_router(ads_router)
 app.include_router(media_kits_router)
 app.include_router(tasks_router)
 app.include_router(analytics_router)
+app.include_router(reports_router)
 app.include_router(exports_router)
 
 @app.get('/api/health')
 def health():
-    return {'ok': True, 'service': 'ChannelDesk API', 'version': '0.27.0'}
+    return {'ok': True, 'service': 'ChannelDesk API', 'version': '0.28.0'}
 
 
 @app.get('/api/health/db-hash')

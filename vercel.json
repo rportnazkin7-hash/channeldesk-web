@@ -1,5 +1,8 @@
 {
-  "rewrites": [{ "source": "/api/(.*)", "destination": "/api/index.py" }],
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.py" },
+    { "source": "/public-report", "destination": "/index.html" }
+  ],
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "headers": [

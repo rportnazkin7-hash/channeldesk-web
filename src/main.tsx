@@ -1,6 +1,7 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import PublicReport from './PublicReport'
 import './styles.css'
 
 const tg = window.Telegram?.WebApp
@@ -9,7 +10,7 @@ try {
   if (typeof tg?.expand === 'function') tg.expand()
   if (typeof tg?.setHeaderColor === 'function') tg.setHeaderColor('#0b0d10')
   if (typeof tg?.setBackgroundColor === 'function') tg.setBackgroundColor('#0b0d10')
-  document.title = 'ChannelDesk v0.27.0'
+  document.title = 'ChannelDesk v0.28.0'
 } catch {}
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: string | null }> {
@@ -33,7 +34,8 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Root element not found')
-createRoot(root).render(<React.StrictMode><ErrorBoundary><App /></ErrorBoundary></React.StrictMode>)
+const publicToken = window.location.pathname === '/public-report' ? new URLSearchParams(window.location.search).get('token') : null
+createRoot(root).render(<React.StrictMode><ErrorBoundary>{publicToken ? <PublicReport token={publicToken} /> : <App />}</ErrorBoundary></React.StrictMode>)
 
 declare global {
   interface Window {
