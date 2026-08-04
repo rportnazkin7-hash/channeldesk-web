@@ -98,6 +98,10 @@ select.field option{background:var(--panel);color:var(--text)}
 .status-confirmed{color:var(--accent-2);background:var(--accent-soft)}
 .no-erid-badge{display:inline-block;font-size:10px;color:var(--accent-2);border:1px solid var(--accent-border);background:var(--accent-soft);border-radius:6px;padding:2px 7px;margin-top:3px;font-weight:600}
 .no-erid-badge.warn{color:var(--warn);border-color:var(--warn-border);background:var(--warn-bg)}
+/* ---------- Редактор поста в календаре ---------- */
+.post-editor{padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--border)}
+.post-editor .primary-btn{margin-top:10px}
+
 /* ---------- Календарь ---------- */
 .cal-head{display:flex;align-items:center;justify-content:space-between;margin:2px 0 2px}
 .cal-head strong{font-size:14px;color:var(--text);letter-spacing:-.2px;font-variant-numeric:tabular-nums}

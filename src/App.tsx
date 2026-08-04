@@ -41,6 +41,7 @@ export default function App(){
  const [draftBtns,setDraftBtns]=useState<Button[]>([]),[draftBtnText,setDraftBtnText]=useState(''),[draftBtnUrl,setDraftBtnUrl]=useState(''),[draftFiles,setDraftFiles]=useState<File[]>([])
  const [calYear,setCalYear]=useState(new Date().getFullYear()),[calMonth,setCalMonth]=useState(new Date().getMonth()),[selectedDay,setSelectedDay]=useState<Date|null>(null)
  const [openPost,setOpenPost]=useState<number|null>(null),[comments,setComments]=useState<Record<number,Comment[]>>({}),[versions,setVersions]=useState<Record<number,Version[]>>({}),[commentText,setCommentText]=useState('')
+ const [editTitle,setEditTitle]=useState(''),[editText,setEditText]=useState('')
  const [assetsByPost,setAssetsByPost]=useState<Record<number,Asset[]>>({})
  const [templates,setTemplates]=useState<Template[]>([]),[newTplName,setNewTplName]=useState(''),[btnText,setBtnText]=useState(''),[btnUrl,setBtnUrl]=useState('')
  const [advertisers,setAdvertisers]=useState<Advertiser[]>([]),[bookings,setBookings]=useState<Booking[]>([]),[finSummary,setFinSummary]=useState<FinanceSummary|null>(null)
@@ -96,7 +97,8 @@ export default function App(){
  function addDraftBtn(){buzz();const t=draftBtnText.trim(),u=draftBtnUrl.trim();if(!t||!u)return;setDraftBtns([...draftBtns,{text:t,url:u}]);setDraftBtnText('');setDraftBtnUrl('')}
  function pickFiles(list:FileList|null){if(!list)return;setDraftFiles([...draftFiles,...Array.from(list)].slice(0,10))}
  async function actPost(id:number,kind:'submit'|'approve'|'changes'|'schedule'|'now'|'cancel'){buzz();if(!active)return;setBusy(true);setError('');try{const w=active.id;if(kind==='submit')await api.submitPost(w,id);if(kind==='approve')await api.approvePost(w,id);if(kind==='changes')await api.requestChanges(w,id);if(kind==='schedule')await api.schedulePost(w,id,new Date(Date.now()+3600000).toISOString());if(kind==='now')await api.publishNow(w,id);if(kind==='cancel')await api.cancelPost(w,id);await load();if(kind==='now')setTimeout(()=>{load()},5000)}catch(e){setError(e instanceof Error?e.message:'Ошибка операции')}finally{setBusy(false)}}
- async function openDetails(id:number){buzz();if(!active)return;const w=active.id;setOpenPost(openPost===id?null:id);if(openPost!==id){try{const [cm,vs,as]=await Promise.all([api.comments(w,id),api.versions(w,id),api.assets(w,id)]);setComments(prev=>({...prev,[id]:cm}));setVersions(prev=>({...prev,[id]:vs}));setAssetsByPost(prev=>({...prev,[id]:as}))}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки деталей')}}}
+ async function savePostContent(id:number){buzz();if(!active)return;setBusy(true);setError('');try{await api.updatePost(active.id,id,{title:editTitle,text:editText});await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка сохранения поста')}finally{setBusy(false)}}
+ async function openDetails(id:number){buzz();if(!active)return;const w=active.id;const post=posts.find(item=>item.id===id);setOpenPost(openPost===id?null:id);if(openPost!==id){setEditTitle(post?.title||'');setEditText(post?.text||'');try{const [cm,vs,as]=await Promise.all([api.comments(w,id),api.versions(w,id),api.assets(w,id)]);setComments(prev=>({...prev,[id]:cm}));setVersions(prev=>({...prev,[id]:vs}));setAssetsByPost(prev=>({...prev,[id]:as}))}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки деталей')}}}
  async function uploadToPost(id:number,files:FileList|null){buzz();if(!active||!files||!files.length)return;const w=active.id;setBusy(true);setError('');try{for(const f of Array.from(files).slice(0,10)){const ticket=await api.uploadTicket(w,{post_id:id,file_name:f.name,content_type:f.type||'application/octet-stream',size:f.size});await api.uploadDirect(ticket,f)}const as=await api.assets(w,id);setAssetsByPost(prev=>({...prev,[id]:as}))}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки вложения')}finally{setBusy(false)}}
  async function delAsset(postId:number,assetId:number){buzz();if(!active)return;try{await api.deleteAsset(assetId);const as=await api.assets(active.id,postId);setAssetsByPost(prev=>({...prev,[postId]:as}))}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления вложения')}}
  async function addCommentTo(id:number){buzz();if(!active||!commentText.trim())return;const w=active.id;try{await api.addComment(w,id,commentText.trim());setCommentText('');const cm=await api.comments(w,id);setComments(prev=>({...prev,[id]:cm}))}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления комментария')}}
@@ -139,6 +141,7 @@ export default function App(){
  }
  function renderPostCard(p:Post){
   const open=openPost===p.id
+  const editable=['idea','draft','in_progress','approved','scheduled'].includes(p.status)
   return <article key={p.id} style={{padding:'14px 0',borderBottom:'1px solid var(--border)'}}>
    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
     <strong style={{fontSize:14}}>{p.title||'(без заголовка)'}</strong>
@@ -163,7 +166,14 @@ export default function App(){
     <button onClick={()=>openDetails(p.id)} disabled={busy} style={{opacity:.8}}>{open?'Свернуть':'Подробнее'}</button>
    </div>
    {open&&<div style={{marginTop:12,padding:12,borderRadius:14,background:'var(--panel-2)',border:'1px solid var(--border)'}}>
-    {(p.status==='draft'||p.status==='in_progress'||p.status==='idea')&&<div style={{marginBottom:12}}>
+    {editable&&<div className="post-editor">
+     <label className="form-label">Заголовок рекламного поста</label>
+     <input className="field" value={editTitle} onChange={e=>setEditTitle(e.target.value)} placeholder="Заголовок" />
+     <label className="form-label">Текст публикации</label>
+     <textarea className="field" rows={7} value={editText} onChange={e=>setEditText(e.target.value)} placeholder="Текст рекламного поста…" />
+     <button className="primary-btn" onClick={()=>void savePostContent(p.id)} disabled={busy}>Сохранить текст поста</button>
+    </div>}
+    {editable&&<div style={{marginBottom:12}}>
      <strong style={{fontSize:13}}>Кнопка (URL)</strong>
      <div style={{display:'flex',gap:8,marginTop:8}}>
       <input placeholder="Текст кнопки" value={btnText} onChange={e=>setBtnText(e.target.value)} style={{flex:1,padding:10,borderRadius:10,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',fontSize:13}}/>
@@ -174,9 +184,9 @@ export default function App(){
     <div style={{marginBottom:12}}>
      <strong style={{fontSize:13,display:'flex',alignItems:'center',gap:6}}><Paperclip size={14}/> Вложения ({(assetsByPost[p.id]||[]).length})</strong>
      {(assetsByPost[p.id]||[]).length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:8,marginTop:8}}>
-      {(assetsByPost[p.id]||[]).map(a=>a.file_type.startsWith('image/')?<div key={a.id} style={{position:'relative'}}><img src={a.file_url} alt={a.file_name} style={{width:64,height:64,borderRadius:10,objectFit:'cover',border:'1px solid var(--border-2)'}}/>{(p.status==='draft'||p.status==='in_progress'||p.status==='idea')&&<button onClick={()=>delAsset(p.id,a.id)} style={{position:'absolute',top:-6,right:-6,background:'var(--danger-bg)',border:'1px solid var(--danger-border)',color:'var(--danger)',borderRadius:'50%',width:20,height:20,display:'grid',placeItems:'center',padding:0}}><X size={11}/></button>}</div>:<div key={a.id} style={{display:'flex',alignItems:'center',gap:6,border:'1px solid var(--border-2)',borderRadius:10,padding:'6px 10px',background:'var(--chip-bg)',fontSize:12}}>📎 <a href={a.file_url} target="_blank" rel="noreferrer" style={{color:'var(--accent-2)',textDecoration:'none'}}>{a.file_name.length>20?a.file_name.slice(0,20)+'…':a.file_name}</a>{(p.status==='draft'||p.status==='in_progress'||p.status==='idea')&&<button onClick={()=>delAsset(p.id,a.id)} style={{background:'none',border:0,color:'var(--danger)',padding:0,marginLeft:4}}><X size={12}/></button>}</div>)}
+      {(assetsByPost[p.id]||[]).map(a=>a.file_type.startsWith('image/')?<div key={a.id} style={{position:'relative'}}><img src={a.file_url} alt={a.file_name} style={{width:64,height:64,borderRadius:10,objectFit:'cover',border:'1px solid var(--border-2)'}}/>{editable&&<button onClick={()=>delAsset(p.id,a.id)} style={{position:'absolute',top:-6,right:-6,background:'var(--danger-bg)',border:'1px solid var(--danger-border)',color:'var(--danger)',borderRadius:'50%',width:20,height:20,display:'grid',placeItems:'center',padding:0}}><X size={11}/></button>}</div>:<div key={a.id} style={{display:'flex',alignItems:'center',gap:6,border:'1px solid var(--border-2)',borderRadius:10,padding:'6px 10px',background:'var(--chip-bg)',fontSize:12}}>📎 <a href={a.file_url} target="_blank" rel="noreferrer" style={{color:'var(--accent-2)',textDecoration:'none'}}>{a.file_name.length>20?a.file_name.slice(0,20)+'…':a.file_name}</a>{editable&&<button onClick={()=>delAsset(p.id,a.id)} style={{background:'none',border:0,color:'var(--danger)',padding:0,marginLeft:4}}><X size={12}/></button>}</div>)}
      </div>}
-     {(p.status==='draft'||p.status==='in_progress'||p.status==='idea')&&<label className="file-btn" style={{marginTop:8}}><Paperclip size={14}/> Добавить файл<input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" style={{display:'none'}} onChange={e=>{uploadToPost(p.id,e.target.files);e.target.value=''}}/></label>}
+     {editable&&<label className="file-btn" style={{marginTop:8}}><Paperclip size={14}/> Добавить файл<input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" style={{display:'none'}} onChange={e=>{uploadToPost(p.id,e.target.files);e.target.value=''}}/></label>}
     </div>
     <div style={{marginBottom:12}}>
      <strong style={{fontSize:13,display:'flex',alignItems:'center',gap:6}}><MessageSquare size={14}/> Комментарии</strong>

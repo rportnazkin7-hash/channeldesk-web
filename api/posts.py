@@ -18,7 +18,7 @@ ALLOWED_STATUSES = {
     'scheduled', 'publishing', 'published', 'failed', 'cancelled',
 }
 CREATABLE = {'idea', 'draft', 'in_progress'}
-EDITABLE = {'idea', 'draft', 'in_progress'}
+EDITABLE = {'idea', 'draft', 'in_progress', 'approved', 'scheduled'}
 PUBLISHED_LOCKED = {'publishing', 'published', 'cancelled'}
 
 

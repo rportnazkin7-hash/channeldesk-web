@@ -86,6 +86,19 @@ def test_update_post_saves_version(monkeypatch):
     assert any('INSERT INTO cd_post_versions' in sql for sql, _ in calls)
 
 
+def test_update_scheduled_ad_post(monkeypatch):
+    scheduled = dict(POST_ROW, status='scheduled', approval_required=False, scheduled_at='2026-08-04T10:00:00Z')
+    updated = dict(scheduled, title='Рекламный заголовок', text='Полный рекламный текст')
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, scheduled, updated])
+    monkeypatch.setattr('api.posts.connect', lambda: conn)
+    r = client.patch('/api/workspaces/3/posts/10',
+                     json={'title': 'Рекламный заголовок', 'text': 'Полный рекламный текст'},
+                     headers=auth_headers())
+    assert r.status_code == 200
+    assert r.json()['status'] == 'scheduled'
+    assert r.json()['text'] == 'Полный рекламный текст'
+
+
 def test_author_cannot_edit_foreign_post(monkeypatch):
     foreign = dict(POST_ROW, created_by=999)
     conn = patch_db(monkeypatch, [USER_ROW, MEMBER_AUTHOR, foreign])
