@@ -73,6 +73,13 @@ function formattedNumber(value: number): string {
   return Number(value || 0).toLocaleString('ru-RU')
 }
 
+function rawMetric(raw: Record<string, unknown> | undefined, key: string): string {
+  const value = raw?.[key]
+  if (typeof value === 'number') return formattedNumber(value)
+  if (typeof value === 'string' && value.trim()) return value
+  return '—'
+}
+
 export default function Analytics({ workspaceId, channels, onBack, onError }: Props) {
   const firstChannel = channels[0]?.id || null
   const [fromDate, setFromDate] = useState(daysAgo(29))
@@ -82,6 +89,7 @@ export default function Analytics({ workspaceId, channels, onBack, onError }: Pr
   const [loading, setLoading] = useState(true)
   const [savingMetric, setSavingMetric] = useState(false)
   const [savingLink, setSavingLink] = useState(false)
+  const [syncingTgstat, setSyncingTgstat] = useState(false)
   const [metric, setMetric] = useState<MetricDraft>(() => metricFormDefaults(firstChannel))
   const [link, setLink] = useState({ channel_id: firstChannel || 0, name: '', url: '', clicks: '', conversions: '', notes: '' })
 
@@ -170,6 +178,22 @@ export default function Analytics({ workspaceId, channels, onBack, onError }: Pr
     }
   }
 
+  async function syncTgstat() {
+    if (!channelFilter) {
+      onError('Сначала выберите один канал в фильтре')
+      return
+    }
+    setSyncingTgstat(true)
+    try {
+      await api.syncTgstat(workspaceId, channelFilter)
+      await load()
+    } catch (error) {
+      onError(error instanceof Error ? error.message : 'Не удалось обновить данные TGStat')
+    } finally {
+      setSyncingTgstat(false)
+    }
+  }
+
   const summary = overview?.summary
   const series = summary?.series || []
   const chartMax = useMemo(() => Math.max(1, ...series.flatMap(point => [point.views, point.reach])), [series])
@@ -191,7 +215,7 @@ export default function Analytics({ workspaceId, channels, onBack, onError }: Pr
       <div className="analytics-heading-title"><BarChart3 size={18} /><h2>Аналитика каналов</h2></div>
       <button className="icon-btn" onClick={() => void load()} disabled={loading} title="Обновить"><RefreshCw size={14} /></button>
     </div>
-    <p className="analytics-note">Данные вводятся вручную или из доступных событий Bot API. Полной нативной статистики Telegram обычному боту не выдаёт.</p>
+    <p className="analytics-note">Данные можно вводить вручную или обновлять из TGStat. Free-тариф даёт текущие показатели, а историю синхронизируем только если её разрешает тариф.</p>
     <button className="analytics-back" onClick={onBack}>← Назад</button>
 
     <div className="analytics-filters">
@@ -199,6 +223,7 @@ export default function Analytics({ workspaceId, channels, onBack, onError }: Pr
       <label className="analytics-control"><span>Период до</span><input className="field" type="date" value={toDate} onChange={event => setToDate(event.target.value)} /></label>
       <label className="analytics-control analytics-filter-channel"><span>Канал</span><select className="field" value={channelFilter ?? ''} onChange={event => setChannelFilter(event.target.value ? Number(event.target.value) : null)}><option value="">Все каналы</option>{channels.map(channel => <option key={channel.id} value={channel.id}>{channel.title}</option>)}</select></label>
     </div>
+    <div className="analytics-tgstat-toolbar"><span>Обновить текущие данные выбранного канала</span><button className="icon-btn" onClick={() => void syncTgstat()} disabled={syncingTgstat || !channelFilter}>{syncingTgstat ? 'Обновляю…' : 'Обновить TGStat'}</button></div>
 
     {loading && !overview ? <div className="empty"><p>Собираю цифры. Они пока не разбежались.</p></div> : <>
       <div className="analytics-kpis">
@@ -209,10 +234,11 @@ export default function Analytics({ workspaceId, channels, onBack, onError }: Pr
       </div>
 
       <section className="analytics-card analytics-telegram-card">
-        <div className="analytics-section-heading"><div><strong>Статистика Telegram</strong><span>Детальные показатели через собственную MTProto-сессию</span></div><span className="analytics-source-badge">MTProto</span></div>
+        <div className="analytics-section-heading"><div><strong>Статистика Telegram</strong><span>Текущие показатели из подключенного источника</span></div><span className="analytics-source-badge">{overview?.mtproto.some(row => row.source === 'tgstat') ? 'TGStat' : 'MTProto'}</span></div>
         {(overview?.mtproto || []).length === 0 ? <p className="analytics-telegram-empty">Сборщик ещё не подключён или статистика для канала недоступна.</p> : <div className="analytics-telegram-list">{overview?.mtproto.map(row => <article className="analytics-telegram-row" key={row.id}>
           <div className="analytics-telegram-title"><strong>{row.channel_title || channelName(row.channel_id)}</strong><span>Обновлено {shortDate(row.captured_at.slice(0, 10))}</span></div>
           <div className="analytics-telegram-values"><div><span>Подписчики</span><strong>{formattedNumber(row.followers_current)}</strong></div><div><span>Просмотров/пост</span><strong>{Number(row.views_per_post || 0).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}</strong></div><div><span>Репостов/пост</span><strong>{Number(row.shares_per_post || 0).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}</strong></div><div><span>Реакций/пост</span><strong>{Number(row.reactions_per_post || 0).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}</strong></div></div>
+          {row.source === 'tgstat' && <div className="analytics-tgstat-extra"><span>Суточный охват: <b>{rawMetric(row.raw, 'daily_reach')}</b></span><span>ERR: <b>{rawMetric(row.raw, 'err_percent')}%</b></span><span>Упоминания: <b>{rawMetric(row.raw, 'mentions_count')}</b></span><span>Постов: <b>{rawMetric(row.raw, 'posts_count')}</b></span></div>}
         </article>)}</div>}
       </section>
 

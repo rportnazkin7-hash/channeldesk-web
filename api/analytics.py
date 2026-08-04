@@ -62,6 +62,10 @@ class LinkUpdate(BaseModel):
     is_active: bool | None = None
 
 
+class TgstatSyncRequest(BaseModel):
+    channel_id: int
+
+
 def _date_range(from_date: date | None, to_date: date | None) -> tuple[date, date]:
     end = to_date or date.today()
     start = from_date or end - timedelta(days=29)
@@ -177,6 +181,14 @@ def list_mtproto_snapshots(workspace_id: int, channel_id: int | None = None,
                            user: dict = Depends(current_user)):
     result = analytics_overview(workspace_id, channel_id, from_date, to_date, user)
     return result['mtproto']
+
+
+@router.post('/workspaces/{workspace_id}/analytics/tgstat/sync', status_code=201)
+def sync_tgstat(workspace_id: int, payload: TgstatSyncRequest, user: dict = Depends(current_user)):
+    member = membership(user['id'], workspace_id)
+    require_action(member, 'analytics.manage')
+    from api.tgstat import sync_channel
+    return sync_channel(workspace_id, payload.channel_id, user)
 
 
 @router.post('/workspaces/{workspace_id}/analytics/metrics', status_code=201)
