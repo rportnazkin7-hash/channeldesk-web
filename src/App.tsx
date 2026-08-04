@@ -4,7 +4,7 @@ import { api,type Workspace,type Pending,type Channel,type Member,type Invite,ty
 import Statistics from './Statistics'
 import Analytics from './Analytics'
 
-const APP_VERSION = 'v0.26.0'
+const APP_VERSION = 'v0.27.0'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
@@ -56,6 +56,7 @@ export default function App(){
  const active=spaces.find(x=>x.id===activeId)||spaces[0]||null
  const [showSettings,setShowSettings]=useState(false)
  const [confirmDelete,setConfirmDelete]=useState(false)
+ const [overdueCancelDays,setOverdueCancelDays]=useState(3),[savingSettings,setSavingSettings]=useState(false)
  const [bookingTab,setBookingTab]=useState<'future'|'active'|'history'>('future')
  const [showAdvForm,setShowAdvForm]=useState(false)
  const [tasks,setTasks]=useState<Task[]>([])
@@ -68,6 +69,8 @@ export default function App(){
  // Тихий фоновый poll: обновляет данные без индикатора загрузки и без сброса открытых карточек.
  const refresh=useCallback(async ()=>{try{const s=await api.workspaces();const a=s.find(x=>x.id===activeId)||s[0]||null;if(!a)return;const [p,c,m,po,t,ad,bk,fs,mk,ts]=await Promise.all([api.pending(),api.channels(a.id),api.members(a.id),api.posts(a.id),api.templates(a.id),api.advertisers(a.id),api.bookings(a.id),api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1),api.mediaKits(a.id),api.tasks(a.id)]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFinSummary(fs);setMediaKits(mk);setTasks(ts);setSpaces(s)}catch{/* фоновая ошибка не должна тревожить пользователя */}},[activeId])
  useEffect(()=>{const timer=setInterval(()=>{refresh()},3000);return ()=>clearInterval(timer)},[refresh])
+ useEffect(()=>{if(!showSettings||!active)return;api.workspaceSettings(active.id).then(settings=>setOverdueCancelDays(settings.overdue_cancel_days)).catch(e=>setError(e instanceof Error?e.message:'Ошибка загрузки настроек'))},[showSettings,active?.id])
+ async function saveWorkspaceSettings(){if(!active)return;setSavingSettings(true);setError('');try{const result=await api.updateWorkspaceSettings(active.id,{overdue_cancel_days:Math.max(1,Math.min(30,Number(overdueCancelDays)||3))});setOverdueCancelDays(result.overdue_cancel_days)}catch(e){setError(e instanceof Error?e.message:'Ошибка сохранения настроек')}finally{setSavingSettings(false)}}
  async function addAdvertiser(){buzz();if(!active)return;setError('');try{await api.createAdvertiser(active.id,{name:advName,notes:advContact});setAdvName('');setAdvContact('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления рекламодателя')}}
  async function delAdvertiser(id:number){buzz();if(!active)return;try{await api.deleteAdvertiser(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления рекламодателя')}}
  async function addBooking(){buzz();if(!active)return;setError('');try{await api.createBooking(active.id,{advertiser_id:bkAdv??0,cost:Number(bkCost)||0,channel_id:bkChannel,publish_at:bkDate?new Date(`${bkDate}T${bkTime||'12:00'}`).toISOString():null,delete_at:bkDate&&bkTime?new Date(new Date(`${bkDate}T${bkTime||'12:00'}`).getTime()+7*86400000).toISOString():null,erid:bkNoErid?null:(bkErid||null),erid_required:!bkNoErid});setBkAdv(null);setBkCost('');setBkDate('');setBkTime('12:00');setBkErid('');setBkNoErid(false);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания брони')}}
@@ -320,6 +323,14 @@ export default function App(){
     <div style={{fontSize:13,color:'var(--muted)'}}>Рабочее пространство</div>
     <p style={{margin:'8px 0 0',fontSize:16,fontWeight:700}}>{active.name}</p>
     <div style={{fontSize:12,color:'var(--muted-2)',marginTop:4}}>Ваша роль: {ROLE_LABEL[active.role]||active.role}</div>
+    <div style={{marginTop:22,paddingTop:14,borderTop:'1px solid var(--border)'}}>
+     <label className="form-label" style={{marginTop:0}}>Дней до автоотмены просроченной брони</label>
+     <p style={{fontSize:11,color:'var(--muted-2)',margin:'5px 0 8px'}}>Неоплаченная бронь после даты публикации станет просроченной, а затем будет отменена автоматически.</p>
+     <div className="btn-row">
+      <input className="field" type="number" min="1" max="30" value={overdueCancelDays} onChange={e=>setOverdueCancelDays(Number(e.target.value)||1)} disabled={!canManage}/>
+      {canManage&&<button className="icon-btn" onClick={()=>void saveWorkspaceSettings()} disabled={savingSettings}>{savingSettings?'Сохраняю…':'Сохранить'}</button>}
+     </div>
+    </div>
     {active.role==='owner'&&<div style={{marginTop:24}}>
      <div style={{fontSize:13,color:'var(--danger)',fontWeight:600}}>Опасная зона</div>
      <p style={{fontSize:12,color:'var(--muted-2)',margin:'6px 0 10px'}}>Удаление скроет агентство и все его данные (каналы, посты, рекламу, финансы). Действие нельзя отменить в интерфейсе.</p>

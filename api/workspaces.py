@@ -25,6 +25,10 @@ class WorkspaceUpdate(BaseModel):
     currency: str | None = Field(default=None, min_length=3, max_length=8)
 
 
+class WorkspaceSettingsUpdate(BaseModel):
+    overdue_cancel_days: int = Field(default=3, ge=1, le=30)
+
+
 class InviteCreate(BaseModel):
     role: str = 'viewer'
     max_uses: int | None = Field(default=None, ge=1, le=1000)
@@ -96,6 +100,38 @@ def update_workspace(workspace_id: int, payload: WorkspaceUpdate, user: dict = D
         ws = cur.fetchone()
         audit(cur, workspace_id, user['id'], 'workspace.updated', 'workspace', workspace_id)
         return {**ws, 'role': member['role'], 'channel_scope': member['channel_scope']}
+
+
+@router.get('/workspaces/{workspace_id}/settings')
+def get_workspace_settings(workspace_id: int, user: dict = Depends(current_user)):
+    member = membership(user['id'], workspace_id)
+    require_action(member, 'workspace.view')
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute('SELECT settings FROM cd_workspaces WHERE id=%s AND is_active=true', (workspace_id,))
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(404, 'Рабочее пространство не найдено')
+    settings = row.get('settings') or {}
+    return {'overdue_cancel_days': int(settings.get('overdue_cancel_days', 3))}
+
+
+@router.patch('/workspaces/{workspace_id}/settings')
+def update_workspace_settings(workspace_id: int, payload: WorkspaceSettingsUpdate,
+                              user: dict = Depends(current_user)):
+    member = membership(user['id'], workspace_id)
+    require_action(member, 'workspace.manage')
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute('SELECT settings FROM cd_workspaces WHERE id=%s AND is_active=true FOR UPDATE', (workspace_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, 'Рабочее пространство не найдено')
+        settings = dict(row.get('settings') or {})
+        settings['overdue_cancel_days'] = payload.overdue_cancel_days
+        cur.execute('UPDATE cd_workspaces SET settings=%s::jsonb,updated_at=now() WHERE id=%s',
+                    (json.dumps(settings), workspace_id))
+        audit(cur, workspace_id, user['id'], 'workspace.settings.updated', 'workspace', workspace_id,
+              json.dumps({'overdue_cancel_days': payload.overdue_cancel_days}))
+    return {'overdue_cancel_days': payload.overdue_cancel_days}
 
 
 @router.delete('/workspaces/{workspace_id}', status_code=204)

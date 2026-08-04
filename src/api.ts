@@ -11,7 +11,7 @@ async function req<T>(path:string,options:RequestInit={}):Promise<T>{
   throw e
  }finally{clearTimeout(timer)}
 }
-export type Workspace={id:number;name:string;role:string}
+export type Workspace={id:number;name:string;role:string;settings?:{overdue_cancel_days?:number}}
 export type Pending={id:number;telegram_chat_id:number;title:string;username:string|null;bot_permissions:Record<string,boolean>}
 export type Channel={id:number;title:string;username:string|null;is_connected:boolean}
 export type Member={id:number;role:string;status:string;channel_scope:number[]|null;telegram_id:number;username:string|null;first_name:string|null;last_name:string|null}
@@ -49,8 +49,10 @@ async function uploadDirect(ticket:UploadTicket,file:File):Promise<void>{
 export const api={
  workspaces:()=>req<Workspace[]>('/api/workspaces'),
  createWorkspace:(name:string)=>req<Workspace>('/api/workspaces',{method:'POST',body:JSON.stringify({name})}),
- deleteWorkspace:(id:number)=>req<void>(`/api/workspaces/${id}`,{method:'DELETE'}),
- pending:()=>req<Pending[]>('/api/channel-connections/pending'),
+  deleteWorkspace:(id:number)=>req<void>(`/api/workspaces/${id}`,{method:'DELETE'}),
+  workspaceSettings:(wid:number)=>req<{overdue_cancel_days:number}>(`/api/workspaces/${wid}/settings`),
+  updateWorkspaceSettings:(wid:number,p:{overdue_cancel_days:number})=>req<{overdue_cancel_days:number}>(`/api/workspaces/${wid}/settings`,{method:'PATCH',body:JSON.stringify(p)}),
+  pending:()=>req<Pending[]>('/api/channel-connections/pending'),
  channels:(wid:number)=>req<Channel[]>(`/api/workspaces/${wid}/channels`),
  connect:(wid:number,id:number)=>req<Channel>(`/api/workspaces/${wid}/channels/connect`,{method:'POST',body:JSON.stringify({connection_id:id})}),
  members:(wid:number)=>req<Member[]>(`/api/workspaces/${wid}/members`),
