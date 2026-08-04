@@ -282,7 +282,7 @@ export default function App(){
     <section className="panel" style={{marginTop:14}}>
      <div className="panel-title"><h2>Размещения</h2><Wallet size={20}/></div>
      <div className="seg" style={{marginTop:10}}>
-      {(['future','active','history'] as const).map(t=><button key={t} className={bookingTab===t?'seg-on':''} onClick={()=>{buzz();setBookingTab(t)}}>{t==='future'?'Будущие':t==='active'?'Активные':'История'}</button>)}
+      {(['future','active','history'] as const).map(t=><button key={t} className={bookingTab===t?'seg-on':''} onClick={()=>{buzz();setBookingTab(t)}}>{t==='future'?'Будущие':t==='active'?'Активные':'Архив'}</button>)}
      </div>
      {bookingTab==='future'&&<>
       <div style={{fontSize:11,color:'var(--muted-2)',margin:'10px 2px 2px'}}>Заявки и подтверждённые брони, которые ещё не начались</div>
@@ -294,7 +294,7 @@ export default function App(){
      </>}
      {bookingTab==='history'&&<>
       <div style={{fontSize:11,color:'var(--muted-2)',margin:'10px 2px 2px'}}>Завершённые, отменённые и просроченные</div>
-      {historyBookings.length===0?<div className="empty"><p>История пуста.</p></div>:historyBookings.map(renderBookingCard)}
+      {historyBookings.length===0?<div className="empty"><p>Архив пуст.</p></div>:historyBookings.map(renderBookingCard)}
      </>}
     </section>
    </>}
