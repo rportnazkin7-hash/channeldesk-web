@@ -130,6 +130,17 @@ def test_workflow_submit_approve_schedule(monkeypatch):
     assert body['publish_key']
 
 
+def test_request_delete_from_telegram(monkeypatch):
+    published = dict(POST_ROW, status='published', telegram_message_id=555)
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, published, {'telegram_chat_id': -100123}, None, {'id': 7, 'status': 'pending'}])
+    monkeypatch.setattr('api.posts.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/posts/10/delete-from-telegram', headers=auth_headers())
+    assert r.status_code == 202
+    assert r.json()['status'] == 'pending'
+    sql = ' '.join(call[0] for cur in conn.cursors for call in cur.calls)
+    assert 'cd_telegram_delete_jobs' in sql
+
+
 def test_schedule_requires_channel(monkeypatch):
     no_channel = dict(POST_ROW, channel_id=None, status='approved')
     conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, no_channel])

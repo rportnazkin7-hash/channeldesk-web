@@ -296,6 +296,37 @@ def publish_now(workspace_id: int, post_id: int, user: dict = Depends(current_us
     return schedule_post(workspace_id, post_id, SchedulePayload(scheduled_at=None), user)
 
 
+@router.post('/workspaces/{workspace_id}/posts/{post_id}/delete-from-telegram', status_code=202)
+def request_delete_from_telegram(workspace_id: int, post_id: int, user: dict = Depends(current_user)):
+    member = membership(user['id'], workspace_id)
+    if member.get('role') == 'ad_manager':
+        require_action(member, 'booking.manage')
+    else:
+        require_action(member, 'post.publish')
+    with connect() as conn, conn.cursor() as cur:
+        post = _get_post(cur, workspace_id, post_id)
+        if post.get('status') != 'published' or not post.get('telegram_message_id') or not post.get('channel_id'):
+            raise HTTPException(422, 'Удалить из Telegram можно только опубликованный пост с сообщением в канале')
+        cur.execute('SELECT telegram_chat_id FROM cd_channels WHERE id=%s AND workspace_id=%s AND is_active=true',
+                    (post['channel_id'], workspace_id))
+        channel = cur.fetchone()
+        if not channel:
+            raise HTTPException(422, 'Канал публикации не найден')
+        cur.execute("""SELECT id,status FROM cd_telegram_delete_jobs
+        WHERE post_id=%s AND status IN ('pending','processing') LIMIT 1""", (post_id,))
+        existing = cur.fetchone()
+        if existing:
+            return {'id': existing['id'], 'status': existing['status'], 'message': 'Удаление уже стоит в очереди'}
+        cur.execute("""INSERT INTO cd_telegram_delete_jobs(
+            workspace_id,post_id,channel_id,telegram_chat_id,telegram_message_id,requested_by)
+        VALUES(%s,%s,%s,%s,%s,%s) RETURNING id,status""",
+                    (workspace_id, post_id, post['channel_id'], channel['telegram_chat_id'],
+                     post['telegram_message_id'], user['id']))
+        job = cur.fetchone()
+        audit(cur, workspace_id, user['id'], 'post.telegram_delete_requested', 'post', post_id)
+    return {'id': job['id'], 'status': job['status'], 'message': 'Удаление будет выполнено ботом в ближайшем цикле'}
+
+
 @router.get('/workspaces/{workspace_id}/posts/{post_id}/versions')
 def post_versions(workspace_id: int, post_id: int, user: dict = Depends(current_user)):
     member = membership(user['id'], workspace_id)

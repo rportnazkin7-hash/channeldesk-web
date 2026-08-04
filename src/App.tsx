@@ -4,7 +4,7 @@ import { api,type Workspace,type Pending,type Channel,type Member,type Invite,ty
 import Statistics from './Statistics'
 import Analytics from './Analytics'
 
-const APP_VERSION = 'v0.29.0'
+const APP_VERSION = 'v0.30.0'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
@@ -99,6 +99,7 @@ export default function App(){
  function pickFiles(list:FileList|null){if(!list)return;setDraftFiles([...draftFiles,...Array.from(list)].slice(0,10))}
  async function actPost(id:number,kind:'submit'|'approve'|'changes'|'schedule'|'now'|'cancel'){buzz();if(!active)return;setBusy(true);setError('');try{const w=active.id;if(kind==='submit')await api.submitPost(w,id);if(kind==='approve')await api.approvePost(w,id);if(kind==='changes')await api.requestChanges(w,id);if(kind==='schedule')await api.schedulePost(w,id,new Date(Date.now()+3600000).toISOString());if(kind==='now')await api.publishNow(w,id);if(kind==='cancel')await api.cancelPost(w,id);await load();if(kind==='now')setTimeout(()=>{load()},5000)}catch(e){setError(e instanceof Error?e.message:'Ошибка операции')}finally{setBusy(false)}}
  async function savePostContent(id:number){buzz();if(!active)return;setBusy(true);setError('');try{await api.updatePost(active.id,id,{title:editTitle,text:editText});await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка сохранения поста')}finally{setBusy(false)}}
+ async function requestDeleteFromTelegram(id:number){buzz();if(!active)return;if(!window.confirm('Удалить опубликованный пост из Telegram? Это действие нельзя отменить.'))return;setBusy(true);setError('');try{const result=await api.deletePostFromTelegram(active.id,id);setExportMsg(result.message);setTimeout(()=>setExportMsg(''),8000)}catch(e){setError(e instanceof Error?e.message:'Ошибка постановки удаления в очередь')}finally{setBusy(false)}}
  async function openDetails(id:number){buzz();if(!active)return;const w=active.id;const post=posts.find(item=>item.id===id);setOpenPost(openPost===id?null:id);if(openPost!==id){setEditTitle(post?.title||'');setEditText(post?.text||'');try{const [cm,vs,as]=await Promise.all([api.comments(w,id),api.versions(w,id),api.assets(w,id)]);setComments(prev=>({...prev,[id]:cm}));setVersions(prev=>({...prev,[id]:vs}));setAssetsByPost(prev=>({...prev,[id]:as}))}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки деталей')}}}
  async function uploadToPost(id:number,files:FileList|null){buzz();if(!active||!files||!files.length)return;const w=active.id;setBusy(true);setError('');try{for(const f of Array.from(files).slice(0,10)){const ticket=await api.uploadTicket(w,{post_id:id,file_name:f.name,content_type:f.type||'application/octet-stream',size:f.size});await api.uploadDirect(ticket,f)}const as=await api.assets(w,id);setAssetsByPost(prev=>({...prev,[id]:as}))}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки вложения')}finally{setBusy(false)}}
  async function delAsset(postId:number,assetId:number){buzz();if(!active)return;try{await api.deleteAsset(assetId);const as=await api.assets(active.id,postId);setAssetsByPost(prev=>({...prev,[postId]:as}))}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления вложения')}}
@@ -161,6 +162,7 @@ export default function App(){
     {p.status==='review'&&canReview&&<><button onClick={()=>actPost(p.id,'approve')} disabled={busy}>✓ Одобрить</button><button onClick={()=>actPost(p.id,'changes')} disabled={busy}>Правки</button></>}
     {p.status==='approved'&&canSchedule&&<><button onClick={()=>actPost(p.id,'now')} disabled={busy}><Send size={14}/> Опубликовать сейчас</button><button onClick={()=>actPost(p.id,'schedule')} disabled={busy}>⏱ +1 час</button></>}
     {p.status==='scheduled'&&canSchedule&&<button onClick={()=>actPost(p.id,'now')} disabled={busy}><Send size={14}/> Опубликовать сейчас</button>}
+    {p.status==='published'&&(canSchedule||canAdvertiserManage)&&<button className="icon-btn danger" onClick={()=>void requestDeleteFromTelegram(p.id)} disabled={busy}>Удалить из Telegram</button>}
     {p.status==='failed'&&canSchedule&&<button onClick={()=>actPost(p.id,'now')} disabled={busy}><Send size={14}/> Повторить</button>}
     {p.status==='cancelled'&&canSchedule&&<button onClick={()=>actPost(p.id,'now')} disabled={busy}><Send size={14}/> Возобновить</button>}
     {p.status==='failed'&&p.last_error&&<p style={{color:'var(--danger)',fontSize:11,marginTop:8,width:'100%'}}>Причина: {p.last_error}</p>}
