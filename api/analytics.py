@@ -22,7 +22,7 @@ def _date_range(from_date: date | None, to_date: date | None) -> tuple[date, dat
     return start, end
 
 
-def _summary(rows: list[dict]) -> dict:
+def _summary(rows: list[dict], links: list[dict]) -> dict:
     latest_by_channel: dict[int, dict] = {}
     series_by_date: dict[str, dict] = {}
     posts_count = 0
@@ -45,6 +45,8 @@ def _summary(rows: list[dict]) -> dict:
         'posts_count': posts_count,
         'reactions': reactions,
         'channels': len(latest_by_channel),
+        'clicks': sum(int(row.get('clicks') or 0) for row in links),
+        'links': len(links),
         'series': [series_by_date[key] for key in sorted(series_by_date)],
         'available': ['subscribers', 'posts_count', 'reactions'],
         'unavailable': ['views', 'reach', 'forwards'],
@@ -68,14 +70,29 @@ def analytics_overview(workspace_id: int, channel_id: int | None = None,
         sql += ' AND m.channel_id=%s'
         params.append(channel_id)
     sql += ' ORDER BY m.metric_date, m.channel_id'
+    link_params: list = [workspace_id]
+    link_sql = """SELECT l.id,l.name,l.url AS target_url,l.clicks,l.channel_id,
+    c.title AS channel_title,b.id AS booking_id,a.name AS advertiser_name
+    FROM cd_channel_links l
+    JOIN cd_channels c ON c.id=l.channel_id
+    LEFT JOIN cd_ad_bookings b ON b.id=l.booking_id
+    LEFT JOIN cd_advertisers a ON a.id=b.advertiser_id
+    WHERE l.workspace_id=%s AND l.is_active=true AND l.tracking_token_hash IS NOT NULL"""
+    if channel_id is not None:
+        link_sql += ' AND l.channel_id=%s'
+        link_params.append(channel_id)
+    link_sql += ' ORDER BY l.created_at DESC,l.id DESC'
     with connect() as conn, conn.cursor() as cur:
         cur.execute(sql, params)
         metrics = cur.fetchall() or []
+        cur.execute(link_sql, link_params)
+        links = cur.fetchall() or []
     return {
         'from_date': start,
         'to_date': end,
         'metrics': metrics,
-        'summary': _summary(metrics),
+        'links': links,
+        'summary': _summary(metrics, links),
         'data_source': 'telegram_bot_api',
     }
 

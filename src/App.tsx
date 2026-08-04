@@ -4,7 +4,7 @@ import { api,type Workspace,type Pending,type Channel,type Member,type Invite,ty
 import Statistics from './Statistics'
 import Analytics from './Analytics'
 
-const APP_VERSION = 'v0.30.0'
+const APP_VERSION = 'v0.31.0'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 type DeleteJob = Awaited<ReturnType<typeof api.deletePostFromTelegramStatus>>
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
@@ -49,6 +49,7 @@ export default function App(){
  const [advertisers,setAdvertisers]=useState<Advertiser[]>([]),[bookings,setBookings]=useState<Booking[]>([]),[finSummary,setFinSummary]=useState<FinanceSummary|null>(null)
  const [advName,setAdvName]=useState(''),[advContact,setAdvContact]=useState('')
  const [reportUrl,setReportUrl]=useState(''),[reportExpires,setReportExpires]=useState(''),[reportBusy,setReportBusy]=useState(false)
+ const [trackingAdvertiserId,setTrackingAdvertiserId]=useState<number|null>(null),[trackingBookingId,setTrackingBookingId]=useState<number|null>(null),[trackingChannelId,setTrackingChannelId]=useState<number|null>(null),[trackingName,setTrackingName]=useState(''),[trackingTarget,setTrackingTarget]=useState(''),[trackingUrl,setTrackingUrl]=useState(''),[trackingBusy,setTrackingBusy]=useState(false)
  const [bkAdv,setBkAdv]=useState<number|null>(null),[bkChannel,setBkChannel]=useState<number|null>(null),[bkCost,setBkCost]=useState(''),[bkDate,setBkDate]=useState(''),[bkTime,setBkTime]=useState('12:00'),[bkErid,setBkErid]=useState(''),[bkNoErid,setBkNoErid]=useState(false)
  const [mediaKits,setMediaKits]=useState<MediaKit[]>([])
  const [showMediaKits,setShowMediaKits]=useState(false)
@@ -80,6 +81,7 @@ export default function App(){
  async function delAdvertiser(id:number){buzz();if(!active)return;try{await api.deleteAdvertiser(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления рекламодателя')}}
  async function createAdvertiserReport(id:number){buzz();if(!active)return;setReportBusy(true);setError('');try{const r=await api.createPublicReport(active.id,id,30);const full=`${window.location.origin}${r.path}`;setReportUrl(full);setReportExpires(r.expires_at);try{await navigator.clipboard.writeText(full)}catch{void 0}}catch(e){setError(e instanceof Error?e.message:'Ошибка создания публичного отчёта')}finally{setReportBusy(false)}}
  async function revokeAdvertiserReport(id:number){buzz();if(!active)return;setReportBusy(true);setError('');try{await api.revokePublicReport(active.id,id);setReportUrl('');setReportExpires('')}catch(e){setError(e instanceof Error?e.message:'Ошибка отзыва публичного отчёта')}finally{setReportBusy(false)}}
+ async function createTrackingLink(){buzz();if(!active)return;if(!trackingChannelId||!trackingName.trim()||!trackingTarget.trim()){setError('Заполните канал, название и целевую ссылку');return}setTrackingBusy(true);setError('');try{const r=await api.createTrackingLink(active.id,{channel_id:trackingChannelId,booking_id:trackingBookingId,name:trackingName.trim(),target_url:trackingTarget.trim()});const full=`${window.location.origin}${r.path}`;setTrackingUrl(full);setTrackingName('');setTrackingTarget('');try{await navigator.clipboard.writeText(full)}catch{void 0}}catch(e){setError(e instanceof Error?e.message:'Ошибка создания ссылки кампании')}finally{setTrackingBusy(false)}}
  async function addBooking(){buzz();if(!active)return;setError('');try{await api.createBooking(active.id,{advertiser_id:bkAdv??0,cost:Number(bkCost)||0,channel_id:bkChannel,publish_at:bkDate?new Date(`${bkDate}T${bkTime||'12:00'}`).toISOString():null,delete_at:bkDate&&bkTime?new Date(new Date(`${bkDate}T${bkTime||'12:00'}`).getTime()+7*86400000).toISOString():null,erid:bkNoErid?null:(bkErid||null),erid_required:!bkNoErid});setBkAdv(null);setBkCost('');setBkDate('');setBkTime('12:00');setBkErid('');setBkNoErid(false);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания брони')}}
  async function payBooking(id:number){buzz();if(!active)return;try{await api.payBooking(active.id,id,'paid');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка отметки оплаты')}}
  async function delBooking(id:number){buzz();if(!active)return;try{await api.deleteBooking(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления брони')}}
@@ -285,6 +287,21 @@ export default function App(){
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><div><strong style={{fontSize:14}}>{a.name}</strong>{a.notes&&<div style={{color:'var(--muted)',fontSize:12}}>{a.notes}</div>}</div><span className="no-erid-badge" style={{marginTop:0}}>{bookings.filter(b=>b.advertiser_id===a.id).length} броней</span></div>
       {canAdvertiserManage&&<><button className="icon-btn" style={{marginTop:9,width:'100%'}} onClick={()=>void createAdvertiserReport(a.id)} disabled={reportBusy}><Link2 size={14}/> {reportBusy?'Создаю ссылку…':'Создать публичный отчёт'}</button><button className="icon-btn danger" style={{marginTop:6,width:'100%'}} onClick={()=>void revokeAdvertiserReport(a.id)} disabled={reportBusy}>Отозвать все публичные ссылки</button></>}
      </div>)}
+    </section>
+
+    <section className="panel" style={{marginTop:14}}>
+     <div className="panel-title"><h2>Ссылка кампании</h2><Link2 size={20}/></div>
+     <p style={{color:'var(--muted)',fontSize:12,margin:'5px 0 0'}}>Переходы считаются автоматически. Ссылка ведёт на целевой URL.</p>
+     {canAdvertiserManage&&<>
+      <div className="btn-row" style={{marginTop:12}}>
+       <select className="field" value={trackingAdvertiserId??''} onChange={e=>{setTrackingAdvertiserId(e.target.value?Number(e.target.value):null);setTrackingBookingId(null)}}><option value="">Рекламодатель (необязательно)</option>{advertisers.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select>
+       <select className="field" value={trackingBookingId??''} onChange={e=>{const id=e.target.value?Number(e.target.value):null;const booking=bookings.find(b=>b.id===id);setTrackingBookingId(id);if(booking?.channel_id)setTrackingChannelId(booking.channel_id)}}><option value="">Бронь (необязательно)</option>{bookings.filter(b=>trackingAdvertiserId?b.advertiser_id===trackingAdvertiserId:true).map(b=><option key={b.id} value={b.id}>#{b.id} · {b.advertiser_name||'Реклама'}</option>)}</select>
+      </div>
+      <select className="field" style={{marginTop:8}} value={trackingChannelId??''} onChange={e=>setTrackingChannelId(e.target.value?Number(e.target.value):null)}><option value="">Канал</option>{channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}</select>
+      <div className="btn-row" style={{marginTop:8}}><input className="field" placeholder="Название ссылки" value={trackingName} onChange={e=>setTrackingName(e.target.value)}/><input className="field" type="url" placeholder="https://целевой-сайт.ru" value={trackingTarget} onChange={e=>setTrackingTarget(e.target.value)}/></div>
+      <button className="primary-btn" onClick={()=>void createTrackingLink()} disabled={trackingBusy}>{trackingBusy?'Создаю…':'Создать ссылку и скопировать'}</button>
+      {trackingUrl&&<div className="invite-box"><p>Ссылка скопирована:</p><code>{trackingUrl}</code></div>}
+     </>}
     </section>
 
     <section className="panel" style={{marginTop:14}}>

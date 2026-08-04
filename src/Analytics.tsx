@@ -83,7 +83,7 @@ export default function Analytics({ workspaceId, channels, onBack, onError }: Pr
         <article className="analytics-kpi"><span>Подписчики</span><strong>{formattedNumber(summary?.subscribers || 0)}</strong></article>
         <article className="analytics-kpi"><span>Новые посты</span><strong>{formattedNumber(summary?.posts_count || 0)}</strong></article>
         <article className="analytics-kpi"><span>Реакции</span><strong>{formattedNumber(summary?.reactions || 0)}</strong></article>
-        <article className="analytics-kpi"><span>Каналы</span><strong>{formattedNumber(summary?.channels || 0)}</strong></article>
+        <article className="analytics-kpi"><span>Переходы</span><strong>{formattedNumber(summary?.clicks || 0)}</strong></article>
       </div>
 
       <section className="analytics-card analytics-availability-card">
@@ -109,6 +109,14 @@ export default function Analytics({ workspaceId, channels, onBack, onError }: Pr
         {(overview?.metrics || []).length === 0 ? <div className="empty"><p>Telegram ещё не прислал данных. После следующего поста или фонового снимка они появятся здесь.</p></div> : overview?.metrics.slice().reverse().slice(0, 30).map(row => <article className="analytics-row" key={row.id}>
           <div className="analytics-row-main"><strong>{shortDate(row.metric_date)} · {row.channel_title || channelName(row.channel_id)}</strong><span>{formattedNumber(row.subscribers)} подписчиков · {formattedNumber(row.posts_count)} постов · {formattedNumber(row.reactions)} реакций</span></div>
           <span className="status status-in_progress">Bot API</span>
+        </article>)}
+      </section>
+
+      <section className="analytics-card analytics-list-card">
+        <div className="analytics-section-heading"><div><strong>Ссылки кампаний</strong><span>Переходы считаются автоматически через ChannelDesk</span></div><span className="analytics-count">{overview?.links.length || 0}</span></div>
+        {(overview?.links || []).length === 0 ? <div className="empty"><p>Ссылок пока нет. Создайте первую в разделе «Клиенты».</p></div> : overview?.links.map(link => <article className="analytics-row" key={link.id}>
+          <div className="analytics-row-main"><strong>{link.name}{link.advertiser_name ? ` · ${link.advertiser_name}` : ''}</strong><span>{link.channel_title || channelName(link.channel_id)} · {formattedNumber(link.clicks)} переходов · {link.target_url}</span></div>
+          <span className="status status-in_progress">{formattedNumber(link.clicks)}</span>
         </article>)}
       </section>
     </>}
