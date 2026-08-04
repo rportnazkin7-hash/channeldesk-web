@@ -269,6 +269,14 @@ nav button.active svg{filter:drop-shadow(0 0 6px #10b98155)}
 .public-booking-ok{display:flex;align-items:center;gap:5px;margin-top:8px;color:var(--accent-2);font-size:11px}
 .public-report-empty,.public-report-state{display:flex;flex-direction:column;align-items:center;gap:9px;padding:38px 10px;color:var(--muted);text-align:center;font-size:12px}
 .public-report-state strong{color:var(--text);font-size:16px}
+.public-report-links{margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+.public-report-links h2{margin:0 0 4px;color:var(--text);font-size:14px}
+.public-report-link{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
+.public-report-link>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.public-report-link strong{color:var(--text-2);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.public-report-link span{color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.public-report-link a{color:var(--accent-2);text-decoration:none}
+.public-report-link>b{flex:0 0 auto;color:var(--accent-2);font-size:12px;white-space:nowrap}
 .public-report-footer{margin:18px 0 0;color:var(--muted-2);font-size:10px;text-align:center}
 @media(max-width:480px){.public-report-page{padding:12px 10px 28px}.public-report-shell{padding:16px;border-radius:14px}.public-report-heading h1{font-size:23px}.public-report-summary{flex-direction:column;gap:4px}}
 @media(min-width:700px){.app{max-width:720px;margin:auto}.stats{grid-template-columns:repeat(4,1fr)}}

@@ -4,7 +4,7 @@ import { api,type Workspace,type Pending,type Channel,type Member,type Invite,ty
 import Statistics from './Statistics'
 import Analytics from './Analytics'
 
-const APP_VERSION = 'v0.31.0'
+const APP_VERSION = 'v0.32.0'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 type DeleteJob = Awaited<ReturnType<typeof api.deletePostFromTelegramStatus>>
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}

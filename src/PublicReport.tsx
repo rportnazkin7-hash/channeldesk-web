@@ -13,11 +13,21 @@ type Booking = {
   channel_title: string | null
 }
 
+type ReportLink = {
+  id: number
+  name: string
+  target_url: string
+  clicks: number
+  booking_id: number
+  channel_title: string | null
+}
+
 type Report = {
   advertiser_name: string
   expires_at: string
   generated_at: string
   bookings: Booking[]
+  links: ReportLink[]
 }
 
 const STATUS: Record<string, string> = { requested: 'Заявка', confirmed: 'Подтверждено', active: 'Активно', done: 'Выполнено', cancelled: 'Отменено', overdue: 'Просрочено' }
@@ -67,6 +77,7 @@ export default function PublicReport({ token }: { token: string }) {
           {booking.status === 'done' && <div className="public-booking-ok"><CheckCircle2 size={14} /> Размещение завершено</div>}
         </article>)}
       </div>
+      {report.links.length > 0 && <section className="public-report-links"><h2>Результаты кампаний</h2>{report.links.map(link => <article className="public-report-link" key={link.id}><div><strong>{link.name}</strong><span>{link.channel_title || 'Канал не указан'} · <a href={link.target_url} target="_blank" rel="noreferrer">{link.target_url}</a></span></div><b>{link.clicks.toLocaleString('ru-RU')} переходов</b></article>)}</section>}
       <p className="public-report-footer">Ссылка действительна до {formatDate(report.expires_at)}.</p>
     </section>
   </main>

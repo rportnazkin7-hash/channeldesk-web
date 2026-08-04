@@ -80,5 +80,15 @@ def get_public_report(token: str):
         ORDER BY b.publish_at DESC NULLS LAST,b.id DESC""",
                     (report['workspace_id'], report['advertiser_id']))
         bookings = cur.fetchall() or []
+        cur.execute("""SELECT l.id,l.name,l.url AS target_url,l.clicks,
+        l.booking_id,c.title AS channel_title
+        FROM cd_channel_links l
+        JOIN cd_ad_bookings b ON b.id=l.booking_id
+        LEFT JOIN cd_channels c ON c.id=l.channel_id
+        WHERE l.workspace_id=%s AND b.advertiser_id=%s
+          AND l.is_active=true AND l.tracking_token_hash IS NOT NULL
+        ORDER BY l.created_at DESC,l.id DESC""",
+                    (report['workspace_id'], report['advertiser_id']))
+        links = cur.fetchall() or []
     return {'advertiser_name': report['advertiser_name'], 'expires_at': report['expires_at'],
-            'bookings': bookings, 'generated_at': now}
+            'bookings': bookings, 'links': links, 'generated_at': now}
