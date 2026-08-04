@@ -256,11 +256,18 @@ def delete_booking(workspace_id: int, booking_id: int, user: dict = Depends(curr
     member = membership(user['id'], workspace_id)
     require_action(member, 'booking.manage')
     with connect() as conn, conn.cursor() as cur:
-        cur.execute('SELECT id FROM cd_ad_bookings WHERE id=%s AND workspace_id=%s', (booking_id, workspace_id))
-        if not cur.fetchone():
+        cur.execute('SELECT id,status FROM cd_ad_bookings WHERE id=%s AND workspace_id=%s', (booking_id, workspace_id))
+        booking = cur.fetchone()
+        if not booking:
             raise HTTPException(404, 'Бронь не найдена')
-        cur.execute('DELETE FROM cd_ad_bookings WHERE id=%s', (booking_id,))
-        audit(cur, workspace_id, user['id'], 'booking.deleted', 'booking', booking_id)
+        if booking['status'] == 'active':
+            # Активное размещение не уничтожаем: переносим в историю как отменённое.
+            # Иначе пользователь нажал «удалить» — и бронь исчезла навсегда.
+            cur.execute("UPDATE cd_ad_bookings SET status='cancelled',updated_at=now() WHERE id=%s", (booking_id,))
+            audit(cur, workspace_id, user['id'], 'booking.cancelled', 'booking', booking_id)
+        else:
+            cur.execute('DELETE FROM cd_ad_bookings WHERE id=%s', (booking_id,))
+            audit(cur, workspace_id, user['id'], 'booking.deleted', 'booking', booking_id)
         return None
 
 

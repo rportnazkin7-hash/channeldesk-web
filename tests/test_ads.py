@@ -184,6 +184,17 @@ def test_viewer_cannot_view_finance(monkeypatch):
     assert r.status_code == 403
 
 
+def test_delete_active_booking_moves_to_history(monkeypatch):
+    active = dict(BOOKING_ROW, status='active')
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, active])
+    monkeypatch.setattr('api.ads.connect', lambda: conn)
+    r = client.delete('/api/workspaces/3/bookings/5', headers=auth_headers())
+    assert r.status_code == 204
+    sql = ' '.join(call[0] for cur in conn.cursors for call in cur.calls)
+    assert "status='cancelled'" in sql
+    assert 'DELETE FROM cd_ad_bookings' not in sql
+
+
 def test_mark_paid_confirms_future_booking(monkeypatch):
     """Оплата будущей брони переводит её в confirmed."""
     from datetime import datetime, timedelta, timezone
