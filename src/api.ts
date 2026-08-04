@@ -28,12 +28,10 @@ export type Booking={id:number;advertiser_id:number;channel_id:number|null;post_
 export type FinanceTx={id:number;booking_id:number|null;type:'income'|'expense';amount:number;currency:string;category:string;description:string;occurred_at:string;advertiser_name?:string|null;channel_title?:string|null}
 export type FinanceTrend={year:number;month:number;income:number;expense:number;profit:number}
 export type FinanceSummary={year:number;month:number;income:number;expense:number;profit:number;count:number;trend:FinanceTrend[]}
-export type ChannelMetric={id:number;workspace_id:number;channel_id:number;channel_title?:string;metric_date:string;subscribers:number;views:number;reach:number;reactions:number;forwards:number;posts_count:number;source:'manual'|'bot_api'|'mtproto';notes:string}
-export type ChannelLink={id:number;workspace_id:number;channel_id:number;channel_title?:string;name:string;url:string;clicks:number;conversions:number;notes:string;is_active:boolean}
-export type AnalyticsSeries={date:string;subscribers:number;views:number;reach:number;reactions:number;forwards:number;posts_count:number}
-export type MtprotoSnapshot={id:number;workspace_id:number;channel_id:number;channel_title?:string;captured_at:string;period_start:string|null;period_end:string|null;followers_current:number;followers_previous:number;views_per_post:number;shares_per_post:number;reactions_per_post:number;views_per_story:number;shares_per_story:number;reactions_per_story:number;enabled_notifications:number;error_text:string|null;source?:'mtproto'|'tgstat';raw?:Record<string,unknown>}
-export type AnalyticsSummary={views:number;reach:number;reactions:number;forwards:number;posts_count:number;subscribers:number;channels:number;clicks:number;conversions:number;links:number;series:AnalyticsSeries[]}
-export type AnalyticsOverview={from_date:string;to_date:string;metrics:ChannelMetric[];links:ChannelLink[];mtproto:MtprotoSnapshot[];summary:AnalyticsSummary}
+export type ChannelMetric={id:number;workspace_id:number;channel_id:number;channel_title?:string;metric_date:string;subscribers:number;views:number;reach:number;reactions:number;forwards:number;posts_count:number;source:'bot_api';notes:string}
+export type AnalyticsSeries={date:string;subscribers:number;reactions:number;posts_count:number}
+export type AnalyticsSummary={subscribers:number;reactions:number;posts_count:number;channels:number;available:string[];unavailable:string[];series:AnalyticsSeries[]}
+export type AnalyticsOverview={from_date:string;to_date:string;metrics:ChannelMetric[];summary:AnalyticsSummary;data_source:'telegram_bot_api'}
 export type MediaKit={id:number;name:string;channel_id:number|null;channel_title:string|null;description:string;audience:Record<string,unknown>;stats:Record<string,unknown>;pricing:unknown[];contacts:Record<string,unknown>;is_active:boolean}
 export type Task={id:number;title:string;description:string;status:'todo'|'in_progress'|'done'|'cancelled';priority:'low'|'normal'|'high'|'urgent';assignee_id:number|null;due_at:string|null;remind_at:string|null;assignee_username:string|null;assignee_first_name:string|null}
 export type UploadTicket={asset_id:number;file_url:string;upload_url:string;anon_key:string;bucket:string}
@@ -90,10 +88,6 @@ export const api={
   financeTransactions:(wid:number,year:number,month:number,limit=100)=>req<FinanceTx[]>(`/api/workspaces/${wid}/finance/transactions?year=${year}&month=${month}&limit=${limit}`),
   createTransaction:(wid:number,p:{type:'income'|'expense';amount:number;category?:string;description?:string;occurred_at?:string})=>req<FinanceTx>(`/api/workspaces/${wid}/finance/transactions`,{method:'POST',body:JSON.stringify(p)}),
   analytics:(wid:number,p:{channel_id?:number;from_date?:string;to_date?:string}={})=>{const q=new URLSearchParams();if(p.channel_id!=null)q.set('channel_id',String(p.channel_id));if(p.from_date)q.set('from_date',p.from_date);if(p.to_date)q.set('to_date',p.to_date);return req<AnalyticsOverview>(`/api/workspaces/${wid}/analytics${q.toString()?`?${q}`:''}`)},
-  createMetric:(wid:number,p:{channel_id:number;metric_date:string;subscribers?:number;views?:number;reach?:number;reactions?:number;forwards?:number;posts_count?:number;source?:'manual'|'bot_api'|'mtproto'|'tgstat';notes?:string})=>req<ChannelMetric>(`/api/workspaces/${wid}/analytics/metrics`,{method:'POST',body:JSON.stringify(p)}),
-  syncTgstat:(wid:number,channel_id:number)=>req<{snapshot_id:number;channel_id:number;channel_title:string;source:string;captured_at:string;stats:Record<string,unknown>}>(`/api/workspaces/${wid}/analytics/tgstat/sync`,{method:'POST',body:JSON.stringify({channel_id})}),
-  createAnalyticsLink:(wid:number,p:{channel_id:number;name:string;url:string;clicks?:number;conversions?:number;notes?:string})=>req<ChannelLink>(`/api/workspaces/${wid}/analytics/links`,{method:'POST',body:JSON.stringify(p)}),
-  deleteAnalyticsLink:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/analytics/links/${id}`,{method:'DELETE'}),
   mediaKits:(wid:number)=>req<MediaKit[]>(`/api/workspaces/${wid}/media-kits`),
  createMediaKit:(wid:number,p:{name:string;channel_id?:number|null;description?:string;stats?:Record<string,unknown>;pricing?:unknown[];contacts?:Record<string,unknown>})=>req<MediaKit>(`/api/workspaces/${wid}/media-kits`,{method:'POST',body:JSON.stringify(p)}),
  updateMediaKit:(wid:number,id:number,p:Record<string,unknown>)=>req<MediaKit>(`/api/workspaces/${wid}/media-kits/${id}`,{method:'PATCH',body:JSON.stringify(p)}),
