@@ -21,9 +21,20 @@ Authorization: Bearer cd_live_...
 
 Ключ показывается только один раз. Не храните его в браузерном JavaScript — для публичного сайта используйте серверную часть.
 
+## Проверка ключа
+
+В Swagger нажмите `Authorize`, вставьте полный ключ `cd_live_...` и нажмите `Authorize`. Swagger сам добавит префикс `Bearer`.
+
+Проверить ключ можно через:
+
+```text
+GET /api/v1/me
+```
+
 ## Endpoints
 
 ```text
+GET  /api/v1/me
 GET  /api/v1/workspaces/{workspace_id}/channels
 POST /api/v1/workspaces/{workspace_id}/drafts
 GET  /api/v1/workspaces/{workspace_id}/posts/{post_id}

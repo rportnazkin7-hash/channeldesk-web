@@ -11,6 +11,7 @@ from urllib.request import Request, urlopen
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from api.auth import current_user
@@ -31,6 +32,7 @@ ALLOWED_SCOPES = {
     'publish:request',
 }
 DEFAULT_SCOPES = ['drafts:create', 'posts:read', 'channels:read']
+partner_bearer = HTTPBearer(auto_error=False)
 WEBHOOK_EVENTS = {
     'post.created',
     'post.submitted',
@@ -101,8 +103,10 @@ def _api_key_from_header(authorization: str | None) -> str:
     return token
 
 
-def partner_api_key(authorization: str | None = Header(default=None)) -> dict:
-    token = _api_key_from_header(authorization)
+def partner_api_key(credentials: HTTPAuthorizationCredentials | None = Depends(partner_bearer)) -> dict:
+    token = _api_key_from_header(
+        f'{credentials.scheme} {credentials.credentials}' if credentials else None
+    )
     with connect() as conn, conn.cursor() as cur:
         cur.execute("""SELECT k.id,k.workspace_id,k.name,k.scopes,k.created_by,k.expires_at,
         w.name AS workspace_name
@@ -271,6 +275,18 @@ def delete_webhook(workspace_id: int, webhook_id: int, user: dict = Depends(curr
 
 
 # ---------- Партнёрский API ----------
+
+@partner_router.get('/me')
+def partner_me(key: dict = Depends(partner_api_key)):
+    return {
+        'api_key_id': key['id'],
+        'workspace_id': key['workspace_id'],
+        'workspace_name': key.get('workspace_name'),
+        'name': key['name'],
+        'scopes': key.get('scopes') or [],
+        'expires_at': key.get('expires_at'),
+    }
+
 
 @partner_router.get('/workspaces/{workspace_id}/channels')
 def partner_channels(workspace_id: int, key: dict = Depends(partner_api_key)):
