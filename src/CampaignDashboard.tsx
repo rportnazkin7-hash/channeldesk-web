@@ -8,6 +8,7 @@ type Props = {
   posts: Post[]
   onOpenPost: (postId: number) => void
   onCreateReport: (advertiserId: number) => void
+  onPayBooking: (bookingId: number) => void
   onDeleteTelegram: (postId: number) => void
 }
 
@@ -24,7 +25,7 @@ function money(value: number, currency: string): string {
   return `${Number(value || 0).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ${currency || 'RUB'}`
 }
 
-export default function CampaignDashboard({ workspaceId, bookings, posts, onOpenPost, onCreateReport, onDeleteTelegram }: Props) {
+export default function CampaignDashboard({ workspaceId, bookings, posts, onOpenPost, onCreateReport, onPayBooking, onDeleteTelegram }: Props) {
   const [selectedId, setSelectedId] = useState<number | null>(bookings[0]?.id || null)
   const [links, setLinks] = useState<TrackingLink[]>([])
   const [loadingLinks, setLoadingLinks] = useState(false)
@@ -67,6 +68,6 @@ export default function CampaignDashboard({ workspaceId, bookings, posts, onOpen
     <div className="campaign-dashboard-card"><div className="campaign-dashboard-card-head"><strong>Рекламный пост</strong><span>{post ? (post.status === 'published' ? 'Опубликован' : STATUS[post.status] || post.status) : 'Не создан'}</span></div>{post ? <><h3>{post.title || '(без заголовка)'}</h3><p>{post.text || 'Текст пока не добавлен.'}</p>{post.buttons?.length ? <div className="campaign-dashboard-chips">{post.buttons.flat().map((button,index)=><span key={index}>🔗 {button.text}</span>)}</div> : null}</> : <div className="campaign-dashboard-empty">Пост появится после создания брони.</div>}</div>
     <div className="campaign-dashboard-card"><div className="campaign-dashboard-card-head"><strong>Период размещения</strong><span>7 дней</span></div><p>{formatDate(selected.publish_at)} — {formatDate(selected.delete_at)}</p></div>
     <div className="campaign-dashboard-card"><div className="campaign-dashboard-card-head"><strong>Ссылки кампании</strong><span>{loadingLinks ? 'загрузка…' : `${campaignLinks.length} шт.`}</span></div>{campaignLinks.length ? campaignLinks.map(link => <div className="campaign-dashboard-link" key={link.id}><div><strong>{link.name}</strong><span>{link.target_url}</span></div><b>{Number(link.clicks || 0).toLocaleString('ru-RU')} переходов</b></div>) : <div className="campaign-dashboard-empty">Ссылок пока нет.</div>}</div>
-    <div className="campaign-dashboard-actions">{post&&<button className="icon-btn" onClick={()=>onOpenPost(post.id)}><FileText size={14}/> Изменить пост</button>}<button className="icon-btn" onClick={()=>onCreateReport(selected.advertiser_id)}><Send size={14}/> Отправить отчёт</button>{post?.status === 'published'&&<button className="icon-btn danger" onClick={()=>onDeleteTelegram(post.id)}><Trash2 size={14}/> Удалить из Telegram</button>}</div>
+    <div className="campaign-dashboard-actions">{post&&<button className="icon-btn" onClick={()=>onOpenPost(post.id)}><FileText size={14}/> Изменить пост</button>}{selected.payment_status!=='paid'&&<button className="icon-btn" onClick={()=>onPayBooking(selected.id)}>✓ Отметить оплату</button>}<button className="icon-btn" onClick={()=>onCreateReport(selected.advertiser_id)}><Send size={14}/> Отправить отчёт</button>{post?.status === 'published'&&<button className="icon-btn danger" onClick={()=>onDeleteTelegram(post.id)}><Trash2 size={14}/> Удалить из Telegram</button>}</div>
   </section>
 }

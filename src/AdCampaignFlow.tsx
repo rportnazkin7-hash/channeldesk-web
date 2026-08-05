@@ -18,12 +18,6 @@ function dateValue(date: Date): string {
   return local.toISOString().slice(0, 10)
 }
 
-function addDays(value: string, days: number): string {
-  const date = new Date(`${value}T12:00:00`)
-  date.setDate(date.getDate() + days)
-  return dateValue(date)
-}
-
 function formatDate(value: string | null): string {
   if (!value) return '—'
   try { return new Date(value).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) } catch { return value }
@@ -37,6 +31,8 @@ export default function AdCampaignFlow({ workspaceId, channels, advertisers, onB
   const [cost, setCost] = useState('')
   const [publishDate, setPublishDate] = useState(today)
   const [publishTime, setPublishTime] = useState('12:00')
+  const [deleteDate, setDeleteDate] = useState(today)
+  const [deleteTime, setDeleteTime] = useState('12:00')
   const [erid, setErid] = useState('')
   const [noErid, setNoErid] = useState(false)
   const [booking, setBooking] = useState<Booking | null>(null)
@@ -51,12 +47,17 @@ export default function AdCampaignFlow({ workspaceId, channels, advertisers, onB
 
   const advertiser = advertisers.find(item => item.id === advertiserId)
   const channel = channels.find(item => item.id === channelId)
-  const deleteDate = publishDate ? addDays(publishDate, 7) : ''
   const uploadedNames = useMemo(() => new Set(assets.map(asset => asset.file_name)), [assets])
 
   async function createBooking() {
-    if (!advertiserId || !channelId || !publishDate || !publishTime || !Number(cost)) {
-      onError('Заполните рекламодателя, канал, стоимость, дату и время')
+    if (!advertiserId || !channelId || !publishDate || !publishTime || !deleteDate || !deleteTime || !Number(cost)) {
+      onError('Заполните рекламодателя, канал, стоимость, даты и время')
+      return
+    }
+    const startsAt = new Date(`${publishDate}T${publishTime}`)
+    const endsAt = new Date(`${deleteDate}T${deleteTime}`)
+    if (endsAt <= startsAt) {
+      onError('Окончание рекламы должно быть позже начала')
       return
     }
     setSaving(true)
@@ -65,8 +66,8 @@ export default function AdCampaignFlow({ workspaceId, channels, advertisers, onB
         advertiser_id: advertiserId,
         channel_id: channelId,
         cost: Number(cost),
-        publish_at: new Date(`${publishDate}T${publishTime}`).toISOString(),
-        delete_at: new Date(`${deleteDate}T${publishTime}`).toISOString(),
+        publish_at: startsAt.toISOString(),
+        delete_at: endsAt.toISOString(),
         erid: noErid ? null : (erid.trim() || null),
         erid_required: !noErid,
       })
@@ -166,9 +167,10 @@ export default function AdCampaignFlow({ workspaceId, channels, advertisers, onB
         <label className="form-label">Рекламодатель</label>
         <select className="field" value={advertiserId ?? ''} onChange={event => setAdvertiserId(event.target.value ? Number(event.target.value) : null)}><option value="">Выберите рекламодателя</option>{advertisers.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
         <div className="campaign-form-row"><div><label className="form-label">Канал</label><select className="field" value={channelId ?? ''} onChange={event => setChannelId(event.target.value ? Number(event.target.value) : null)}><option value="">Выберите канал</option>{channels.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></div><div><label className="form-label">Формат</label><select className="field" defaultValue="post"><option value="post">Пост</option><option value="mention">Упоминание</option><option value="repost">Репост</option></select></div></div>
-        <div className="campaign-form-row"><div><label className="form-label">Начало</label><input className="field" type="date" value={publishDate} onChange={event => setPublishDate(event.target.value)} /></div><div><label className="form-label">Время</label><input className="field" type="time" value={publishTime} onChange={event => setPublishTime(event.target.value)} /></div></div>
+        <div className="campaign-form-row"><div><label className="form-label">Начало рекламы</label><input className="field" type="date" value={publishDate} onChange={event => setPublishDate(event.target.value)} /></div><div><label className="form-label">Окончание рекламы</label><input className="field" type="date" value={deleteDate} onChange={event => setDeleteDate(event.target.value)} /></div></div>
+        <div className="campaign-form-row"><div><label className="form-label">Время начала</label><input className="field" type="time" value={publishTime} onChange={event => setPublishTime(event.target.value)} /></div><div><label className="form-label">Время окончания</label><input className="field" type="time" value={deleteTime} onChange={event => setDeleteTime(event.target.value)} /></div></div>
         <label className="form-label">Стоимость, ₽</label><input className="field" type="number" min="0" value={cost} onChange={event => setCost(event.target.value)} placeholder="15000" />
-        <p className="campaign-hint">Окончание размещения: {deleteDate || '—'}</p>
+        <p className="campaign-hint">Размещение будет занято ровно на выбранный период.</p>
       </div>
       <div className="campaign-card"><div className="campaign-card-title"><strong>Оплата</strong><span className="status status-cancelled">Не оплачено</span></div><p className="campaign-hint">Пост не уйдёт в канал, пока бронь не будет оплачена.</p></div>
       <label className="campaign-checkbox"><input type="checkbox" checked={noErid} onChange={event => setNoErid(event.target.checked)} /><span>ERID не требуется</span></label>
