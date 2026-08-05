@@ -43,6 +43,7 @@ export default function App(){
  const [posts,setPosts]=useState<Post[]>([]),[newTitle,setNewTitle]=useState(''),[newText,setNewText]=useState(''),[draftChannel,setDraftChannel]=useState<number|null>(null),[busy,setBusy]=useState(false)
  const [draftBtns,setDraftBtns]=useState<Button[]>([]),[draftBtnText,setDraftBtnText]=useState(''),[draftBtnUrl,setDraftBtnUrl]=useState(''),[draftFiles,setDraftFiles]=useState<File[]>([])
  const [calYear,setCalYear]=useState(new Date().getFullYear()),[calMonth,setCalMonth]=useState(new Date().getMonth()),[selectedDay,setSelectedDay]=useState<Date|null>(null)
+ const [calendarChannel,setCalendarChannel]=useState<number|null>(null),[calendarQuery,setCalendarQuery]=useState(''),[calendarStatus,setCalendarStatus]=useState<'all'|'scheduled'|'review'|'published'>('all')
  const [openPost,setOpenPost]=useState<number|null>(null),[comments,setComments]=useState<Record<number,Comment[]>>({}),[versions,setVersions]=useState<Record<number,Version[]>>({}),[commentText,setCommentText]=useState('')
  const [editTitle,setEditTitle]=useState(''),[editText,setEditText]=useState('')
  const [assetsByPost,setAssetsByPost]=useState<Record<number,Asset[]>>({})
@@ -128,7 +129,9 @@ export default function App(){
  const hint=error?errorHint(error):''
  const todayKey=dayKey(new Date())
  const calCells=monthGrid(calYear,calMonth)
- const dayPosts=selectedDay?posts.filter(p=>postDayKey(p)===dayKey(selectedDay)):posts
+ const calendarPosts=posts.filter(p=>{const query=calendarQuery.trim().toLowerCase();const matchesChannel=calendarChannel==null||p.channel_id===calendarChannel;const matchesStatus=calendarStatus==='all'||p.status===calendarStatus;const matchesQuery=!query||`${p.title||''} ${p.text||''} ${p.channel_title||''}`.toLowerCase().includes(query);return matchesChannel&&matchesStatus&&matchesQuery})
+ const dayPosts=selectedDay?calendarPosts.filter(p=>postDayKey(p)===dayKey(selectedDay)):calendarPosts
+ function calendarDayClass(day:Date){const dayItems=calendarPosts.filter(p=>postDayKey(p)===dayKey(day));if(!dayItems.length)return '';if(dayItems.some(p=>p.status==='review'))return 'has has-review';if(dayItems.some(p=>p.status==='published'))return 'has has-published';return 'has has-scheduled'}
 
  const futureBookings=bookings.filter(b=>['requested','confirmed'].includes(b.status))
  const activeBookings=bookings.filter(b=>b.status==='active')
@@ -262,13 +265,18 @@ export default function App(){
       <strong>{MONTHS[calMonth]} {calYear}</strong>
       <button className="icon-btn" onClick={()=>{buzz();setCalMonth(m=>m===11?(setCalYear(y=>y+1),0):m+1)}}><ChevronRight size={17}/></button>
      </div>
+     <div className="calendar-toolbar">
+      <input className="field" placeholder="Поиск по публикациям…" value={calendarQuery} onChange={e=>setCalendarQuery(e.target.value)} />
+      <select className="field" value={calendarChannel??''} onChange={e=>setCalendarChannel(e.target.value?Number(e.target.value):null)}><option value="">Все каналы</option>{channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}</select>
+     </div>
+     <div className="calendar-status-filter">{(['all','scheduled','review','published'] as const).map(status=><button key={status} className={calendarStatus===status?'active':''} onClick={()=>{buzz();setCalendarStatus(status)}}>{status==='all'?'Все':status==='scheduled'?'Запланированы':status==='review'?'Согласование':'Опубликованы'}</button>)}</div>
      <div className="cal-grid">{['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(d=><div key={d} className="cal-dow">{d}</div>)}
-      {calCells.map((d,i)=>d?(()=>{const k=dayKey(d);const has=posts.some(p=>postDayKey(p)===k);const sel=selectedDay&&dayKey(selectedDay)===k;return <button key={i} className={"cal-day"+(has?' has':'')+(sel?' sel':'')+(k===todayKey?' today':'')} onClick={()=>{buzz();setSelectedDay(sel?null:d)}}><span>{d.getDate()}</span>{has&&<i/>}</button>})():<div key={i} className="cal-day empty"/>)}
+      {calCells.map((d,i)=>d?(()=>{const k=dayKey(d);const dayClass=calendarDayClass(d);const has=!!dayClass;const sel=selectedDay&&dayKey(selectedDay)===k;return <button key={i} className={"cal-day "+dayClass+(sel?' sel':'')+(k===todayKey?' today':'')} onClick={()=>{buzz();setSelectedDay(sel?null:d)}}><span>{d.getDate()}</span>{has&&<i/>}</button>})():<div key={i} className="cal-day empty"/>)}
      </div>
      <div className="cal-hint">{selectedDay?`Посты за ${selectedDay.getDate()} ${MONTHS[selectedDay.getMonth()]}`:'Выберите день, чтобы фильтровать посты'}</div>
     </section>
 
-    <section className="panel" style={{marginTop:14}}><div className="panel-title"><h2>Публикации</h2><Clock size={20}/></div>
+    <section className="panel" style={{marginTop:14}}><div className="panel-title"><h2>Публикации <span className="calendar-count">{dayPosts.length}</span></h2><Clock size={20}/></div>
      <div className="btn-row" style={{marginBottom:12}}>
       <button className="icon-btn" onClick={()=>sendExport('posts','csv')}><Download size={14}/> CSV</button>
       <button className="icon-btn" onClick={()=>sendExport('posts','xlsx')}><Download size={14}/> XLSX</button>

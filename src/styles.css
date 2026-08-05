@@ -151,6 +151,19 @@ select.field option{background:var(--panel);color:var(--text)}
 .cal-day i{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--accent-2)}
 .cal-day.empty{border-color:transparent;background:none}
 .cal-hint{margin-top:8px;font-size:10px;color:var(--muted-2);text-align:center;line-height:1.5}
+.calendar-toolbar{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:8px;margin-top:12px}
+.calendar-toolbar .field{min-width:0}
+.calendar-status-filter{display:flex;gap:4px;overflow-x:auto;margin-top:8px;padding-bottom:2px}
+.calendar-status-filter button{flex:0 0 auto;border:1px solid var(--border);background:var(--panel-2);color:var(--muted);border-radius:8px;padding:7px 9px;font-size:10px;white-space:nowrap}
+.calendar-status-filter button.active{border-color:var(--accent-border);background:var(--accent-soft);color:var(--accent-2)}
+.calendar-count{display:inline-grid;place-items:center;min-width:21px;height:19px;margin-left:4px;padding:0 5px;border:1px solid var(--border-2);border-radius:6px;color:var(--muted);font-size:10px;vertical-align:2px;font-variant-numeric:tabular-nums}
+.cal-day.has-scheduled{background:var(--accent-soft);border-color:var(--accent-border);color:var(--accent-2)}
+.cal-day.has-review{background:var(--warn-bg);border-color:var(--warn-border);color:var(--warn)}
+.cal-day.has-published{background:#10253a;border-color:#1e4b73;color:#7dd3fc}
+.cal-day.has-scheduled i{background:var(--accent-2)}
+.cal-day.has-review i{background:var(--warn)}
+.cal-day.has-published i{background:#7dd3fc}
+@media(max-width:430px){.calendar-toolbar{grid-template-columns:1fr}.calendar-status-filter button{padding-left:8px;padding-right:8px}}
 /* ---------- Меню «Ещё» ---------- */
 .menu-item{display:flex;gap:11px;align-items:center;width:100%;background:none;border:0;border-bottom:1px solid var(--border);padding:12px 2px;color:var(--text);text-align:left}
 .menu-icon{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:var(--chip-bg);color:var(--accent-2);flex:0 0 auto}
