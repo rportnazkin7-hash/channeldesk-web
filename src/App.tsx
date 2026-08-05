@@ -7,7 +7,7 @@ import AdCampaignFlow from './AdCampaignFlow'
 import CampaignDashboard from './CampaignDashboard'
 import AdCalendar from './AdCalendar'
 
-const APP_VERSION = 'v0.42.0'
+const APP_VERSION = 'v0.43.0'
 type Tab = 'overview'|'posts'|'ads'|'more'
 type ClientView = 'campaigns'|'calendar'
 type DeleteJob = Awaited<ReturnType<typeof api.deletePostFromTelegramStatus>>
@@ -57,6 +57,7 @@ export default function App(){
  const [advName,setAdvName]=useState(''),[advContact,setAdvContact]=useState('')
  const [reportUrl,setReportUrl]=useState(''),[reportExpires,setReportExpires]=useState(''),[reportBusy,setReportBusy]=useState(false)
  const [trackingAdvertiserId,setTrackingAdvertiserId]=useState<number|null>(null),[trackingBookingId,setTrackingBookingId]=useState<number|null>(null),[trackingChannelId,setTrackingChannelId]=useState<number|null>(null),[trackingName,setTrackingName]=useState(''),[trackingTarget,setTrackingTarget]=useState(''),[trackingUrl,setTrackingUrl]=useState(''),[trackingBusy,setTrackingBusy]=useState(false)
+ const [slotPageChannelId,setSlotPageChannelId]=useState<number|null>(null),[slotPageTitle,setSlotPageTitle]=useState('Рекламные размещения'),[slotPageDescription,setSlotPageDescription]=useState(''),[slotPageCost,setSlotPageCost]=useState(''),[slotPageUrl,setSlotPageUrl]=useState(''),[slotPageBusy,setSlotPageBusy]=useState(false)
  const [bkAdv,setBkAdv]=useState<number|null>(null),[bkChannel,setBkChannel]=useState<number|null>(null),[bkCost,setBkCost]=useState(''),[bkDate,setBkDate]=useState(''),[bkTime,setBkTime]=useState('12:00'),[bkErid,setBkErid]=useState(''),[bkNoErid,setBkNoErid]=useState(false)
  const [mediaKits,setMediaKits]=useState<MediaKit[]>([])
  const [showMediaKits,setShowMediaKits]=useState(false)
@@ -93,6 +94,7 @@ export default function App(){
  async function createAdvertiserReport(id:number){buzz();if(!active)return;setReportBusy(true);setError('');try{const r=await api.createPublicReport(active.id,id,30);const full=`${window.location.origin}${r.path}`;setReportUrl(full);setReportExpires(r.expires_at);try{await navigator.clipboard.writeText(full)}catch{void 0}}catch(e){setError(e instanceof Error?e.message:'Ошибка создания публичного отчёта')}finally{setReportBusy(false)}}
  async function revokeAdvertiserReport(id:number){buzz();if(!active)return;setReportBusy(true);setError('');try{await api.revokePublicReport(active.id,id);setReportUrl('');setReportExpires('')}catch(e){setError(e instanceof Error?e.message:'Ошибка отзыва публичного отчёта')}finally{setReportBusy(false)}}
  async function createTrackingLink(){buzz();if(!active)return;if(!trackingChannelId||!trackingName.trim()||!trackingTarget.trim()){setError('Заполните канал, название и целевую ссылку');return}setTrackingBusy(true);setError('');try{const r=await api.createTrackingLink(active.id,{channel_id:trackingChannelId,booking_id:trackingBookingId,name:trackingName.trim(),target_url:trackingTarget.trim()});const full=`${window.location.origin}${r.path}`;setTrackingUrl(full);setTrackingName('');setTrackingTarget('');try{await navigator.clipboard.writeText(full)}catch{void 0}}catch(e){setError(e instanceof Error?e.message:'Ошибка создания ссылки кампании')}finally{setTrackingBusy(false)}}
+ async function createSlotPage(){buzz();if(!active)return;if(!slotPageChannelId){setError('Выберите канал для витрины');return}setSlotPageBusy(true);setError('');try{const r=await api.createSlotPage(active.id,slotPageChannelId,{title:slotPageTitle,description:slotPageDescription,default_cost:Number(slotPageCost)||0,currency:'RUB'});const full=`${window.location.origin}${r.path}`;setSlotPageUrl(full);try{await navigator.clipboard.writeText(full)}catch{void 0}}catch(e){setError(e instanceof Error?e.message:'Ошибка создания витрины')}finally{setSlotPageBusy(false)}}
  async function addBooking(){buzz();if(!active)return;setError('');try{await api.createBooking(active.id,{advertiser_id:bkAdv??0,cost:Number(bkCost)||0,channel_id:bkChannel,publish_at:bkDate?new Date(`${bkDate}T${bkTime||'12:00'}`).toISOString():null,delete_at:bkDate&&bkTime?new Date(new Date(`${bkDate}T${bkTime||'12:00'}`).getTime()+7*86400000).toISOString():null,erid:bkNoErid?null:(bkErid||null),erid_required:!bkNoErid});setBkAdv(null);setBkCost('');setBkDate('');setBkTime('12:00');setBkErid('');setBkNoErid(false);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания брони')}}
  async function payBooking(id:number){buzz();if(!active)return;try{await api.payBooking(active.id,id,'paid');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка отметки оплаты')}}
  async function delBooking(id:number){buzz();if(!active)return;try{await api.deleteBooking(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления брони')}}
@@ -312,6 +314,19 @@ export default function App(){
       <div className="btn-row" style={{marginTop:8}}><input className="field" placeholder="Название ссылки" value={trackingName} onChange={e=>setTrackingName(e.target.value)}/><input className="field" type="url" placeholder="https://целевой-сайт.ru" value={trackingTarget} onChange={e=>setTrackingTarget(e.target.value)}/></div>
       <button className="primary-btn" onClick={()=>void createTrackingLink()} disabled={trackingBusy}>{trackingBusy?'Создаю…':'Создать ссылку и скопировать'}</button>
       {trackingUrl&&<div className="invite-box"><p>Ссылка скопирована:</p><code>{trackingUrl}</code></div>}
+     </>}
+    </section>
+
+    <section className="panel" style={{marginTop:14}}>
+     <div className="panel-title"><h2>Витрина свободных слотов</h2><CalendarDays size={20}/></div>
+     <p style={{color:'var(--muted)',fontSize:12,margin:'5px 0 0'}}>Одна ссылка на этот канал: рекламодатель сам выберет свободный период и отправит заявку.</p>
+     {canAdvertiserManage&&<>
+      <select className="field" style={{marginTop:10}} value={slotPageChannelId??''} onChange={e=>setSlotPageChannelId(e.target.value?Number(e.target.value):null)}><option value="">Канал</option>{channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}</select>
+      <input className="field" style={{marginTop:8}} value={slotPageTitle} onChange={e=>setSlotPageTitle(e.target.value)} placeholder="Название витрины" />
+      <textarea className="field" rows={2} style={{marginTop:8}} value={slotPageDescription} onChange={e=>setSlotPageDescription(e.target.value)} placeholder="Короткое описание канала и аудитории" />
+      <input className="field" style={{marginTop:8}} type="number" min="0" value={slotPageCost} onChange={e=>setSlotPageCost(e.target.value)} placeholder="Базовая стоимость, ₽" />
+      <button className="primary-btn" onClick={()=>void createSlotPage()} disabled={slotPageBusy}>{slotPageBusy?'Создаю…':'Создать ссылку витрины и скопировать'}</button>
+      {slotPageUrl&&<div className="invite-box"><p>Ссылка витрины скопирована:</p><code>{slotPageUrl}</code></div>}
      </>}
     </section>
 

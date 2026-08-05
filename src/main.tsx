@@ -2,6 +2,7 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import PublicReport from './PublicReport'
+import PublicSlots from './PublicSlots'
 import './styles.css'
 
 const tg = window.Telegram?.WebApp
@@ -10,7 +11,7 @@ try {
   if (typeof tg?.expand === 'function') tg.expand()
   if (typeof tg?.setHeaderColor === 'function') tg.setHeaderColor('#0b0d10')
   if (typeof tg?.setBackgroundColor === 'function') tg.setBackgroundColor('#0b0d10')
-  document.title = 'ChannelDesk v0.42.0'
+  document.title = 'ChannelDesk v0.43.0'
 } catch {}
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: string | null }> {
@@ -34,8 +35,10 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Root element not found')
-const publicToken = window.location.pathname === '/public-report' ? new URLSearchParams(window.location.search).get('token') : null
-createRoot(root).render(<React.StrictMode><ErrorBoundary>{publicToken ? <PublicReport token={publicToken} /> : <App />}</ErrorBoundary></React.StrictMode>)
+const query = new URLSearchParams(window.location.search)
+const publicReportToken = window.location.pathname === '/public-report' ? query.get('token') : null
+const publicSlotsToken = window.location.pathname === '/public-slots' ? query.get('token') : null
+createRoot(root).render(<React.StrictMode><ErrorBoundary>{publicReportToken ? <PublicReport token={publicReportToken} /> : publicSlotsToken ? <PublicSlots token={publicSlotsToken} /> : <App />}</ErrorBoundary></React.StrictMode>)
 
 declare global {
   interface Window {

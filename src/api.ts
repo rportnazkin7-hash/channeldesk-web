@@ -100,6 +100,7 @@ export const api={
   analytics:(wid:number,p:{channel_id?:number;from_date?:string;to_date?:string}={})=>{const q=new URLSearchParams();if(p.channel_id!=null)q.set('channel_id',String(p.channel_id));if(p.from_date)q.set('from_date',p.from_date);if(p.to_date)q.set('to_date',p.to_date);return req<AnalyticsOverview>(`/api/workspaces/${wid}/analytics${q.toString()?`?${q}`:''}`)},
   trackingLinks:(wid:number)=>req<TrackingLink[]>(`/api/workspaces/${wid}/tracking-links`),
   createTrackingLink:(wid:number,p:{channel_id:number;booking_id?:number|null;name:string;target_url:string;notes?:string})=>req<TrackingLink & {path:string;source:string}>(`/api/workspaces/${wid}/tracking-links`,{method:'POST',body:JSON.stringify(p)}),
+  createSlotPage:(wid:number,channelId:number,p:{title?:string;description?:string;default_cost?:number;currency?:string})=>req<{id:number;channel_title:string;path:string}>(`/api/workspaces/${wid}/channels/${channelId}/public-slots`,{method:'POST',body:JSON.stringify(p)}),
   deleteTrackingLink:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/tracking-links/${id}`,{method:'DELETE'}),
   mediaKits:(wid:number)=>req<MediaKit[]>(`/api/workspaces/${wid}/media-kits`),
  createMediaKit:(wid:number,p:{name:string;channel_id?:number|null;description?:string;stats?:Record<string,unknown>;pricing?:unknown[];contacts?:Record<string,unknown>})=>req<MediaKit>(`/api/workspaces/${wid}/media-kits`,{method:'POST',body:JSON.stringify(p)}),
