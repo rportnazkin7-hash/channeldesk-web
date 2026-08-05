@@ -7,7 +7,7 @@ import AdCampaignFlow from './AdCampaignFlow'
 import CampaignDashboard from './CampaignDashboard'
 import AdCalendar from './AdCalendar'
 
-const APP_VERSION = 'v0.43.0'
+const APP_VERSION = 'v0.44.0'
 type Tab = 'overview'|'posts'|'ads'|'more'
 type ClientView = 'campaigns'|'calendar'
 type DeleteJob = Awaited<ReturnType<typeof api.deletePostFromTelegramStatus>>
