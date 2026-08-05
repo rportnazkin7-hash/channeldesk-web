@@ -1,11 +1,11 @@
-import { useCallback,useEffect,useState } from 'react'
+import { useCallback,useEffect,useRef,useState } from 'react'
 import { Activity,BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download } from 'lucide-react'
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit,type Task } from './api'
 import Statistics from './Statistics'
 import Analytics from './Analytics'
 import AdCampaignFlow from './AdCampaignFlow'
 
-const APP_VERSION = 'v0.34.0'
+const APP_VERSION = 'v0.35.0'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 type DeleteJob = Awaited<ReturnType<typeof api.deletePostFromTelegramStatus>>
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
@@ -30,7 +30,7 @@ function validButtonUrl(url:string){return /^(https?:\/\/|tg:\/\/)/i.test(url.tr
 
 function errorHint(msg:string):string{
  if(msg.includes('401')) return 'Telegram-авторизация не получена. Откройте приложение через Telegram (кнопка WebApp у @channel_desk_bot), а не через браузер.'
- if(msg.includes('503')) return 'Серверная служба недоступна: проверьте DATABASE_URL на Vercel и состояние БД Supabase.'
+ if(msg.includes('503')) return 'Сервер временно не подключился к базе. Обновление повторится автоматически; если ошибка не исчезнет, проверьте Supabase и Vercel.'
  if(msg.includes('500')) return 'Внутренняя ошибка сервера. Проверьте журналы Vercel и состояние миграций БД.'
  if(msg.includes('429')) return 'Слишком много запросов. Подождите минуту и обновите экран.'
  if(msg.includes('Нет соединения')||msg.includes('не ответил')) return 'Проверьте интернет-соединение и обновите экран (кнопка со стрелками вверху).'
@@ -71,11 +71,12 @@ export default function App(){
  const [taskTitle,setTaskTitle]=useState(''),[taskDesc,setTaskDesc]=useState(''),[taskPriority,setTaskPriority]=useState('normal'),[taskDue,setTaskDue]=useState('')
  const [mkName,setMkName]=useState(''),[mkChannel,setMkChannel]=useState<number|null>(null),[mkDesc,setMkDesc]=useState(''),[mkSubs,setMkSubs]=useState(''),[mkPrice,setMkPrice]=useState('')
  const hasInitData=!!(window.Telegram?.WebApp?.initData)
+ const refreshInFlight=useRef(false)
 
  async function load(){setLoading(true);setError('');try{const s=await api.workspaces();setSpaces(s);const a=s.find(x=>x.id===activeId)||s[0]||null;setActiveId(a?a.id:null);const [p,c,m,po,t,ad,bk,fs,mk,ts]=await Promise.all([api.pending(),a?api.channels(a.id):Promise.resolve([]),a?api.members(a.id):Promise.resolve([]),a?api.posts(a.id):Promise.resolve([]),a?api.templates(a.id):Promise.resolve([]),a?api.advertisers(a.id):Promise.resolve([]),a?api.bookings(a.id):Promise.resolve([]),a?api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1):Promise.resolve(null),a?api.mediaKits(a.id):Promise.resolve([]),a?api.tasks(a.id):Promise.resolve([])]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFinSummary(fs);setMediaKits(mk);setTasks(ts);setOpenPost(null)}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки')}finally{setLoading(false)}}
  // Тихий фоновый poll: обновляет данные без индикатора загрузки и без сброса открытых карточек.
- const refresh=useCallback(async ()=>{try{const s=await api.workspaces();const a=s.find(x=>x.id===activeId)||s[0]||null;if(!a)return;const [p,c,m,po,t,ad,bk,fs,mk,ts]=await Promise.all([api.pending(),api.channels(a.id),api.members(a.id),api.posts(a.id),api.templates(a.id),api.advertisers(a.id),api.bookings(a.id),api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1),api.mediaKits(a.id),api.tasks(a.id)]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFinSummary(fs);setMediaKits(mk);setTasks(ts);setSpaces(s)}catch{/* фоновая ошибка не должна тревожить пользователя */}},[activeId])
- useEffect(()=>{const timer=setInterval(()=>{refresh()},3000);return ()=>clearInterval(timer)},[refresh])
+ const refresh=useCallback(async ()=>{if(refreshInFlight.current)return;refreshInFlight.current=true;try{const s=await api.workspaces();const a=s.find(x=>x.id===activeId)||s[0]||null;if(!a)return;const [p,c,m,po,t,ad,bk,fs,mk,ts]=await Promise.all([api.pending(),api.channels(a.id),api.members(a.id),api.posts(a.id),api.templates(a.id),api.advertisers(a.id),api.bookings(a.id),api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1),api.mediaKits(a.id),api.tasks(a.id)]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFinSummary(fs);setMediaKits(mk);setTasks(ts);setSpaces(s)}catch{/* фоновая ошибка не должна тревожить пользователя */}finally{refreshInFlight.current=false}},[activeId])
+ useEffect(()=>{const timer=setInterval(()=>{refresh()},15000);return ()=>clearInterval(timer)},[refresh])
  useEffect(()=>{if(!showSettings||!active)return;api.workspaceSettings(active.id).then(settings=>setOverdueCancelDays(settings.overdue_cancel_days)).catch(e=>setError(e instanceof Error?e.message:'Ошибка загрузки настроек'))},[showSettings,active?.id])
  useEffect(()=>{if(!deletePostId||!deleteJob||deleteJob.status==='done'||deleteJob.status==='failed')return;const timer=setInterval(()=>{void checkDeleteStatus(deletePostId)},5000);return ()=>clearInterval(timer)},[deletePostId,deleteJob?.status,active?.id])
  async function saveWorkspaceSettings(){if(!active)return;setSavingSettings(true);setError('');try{const result=await api.updateWorkspaceSettings(active.id,{overdue_cancel_days:Math.max(1,Math.min(30,Number(overdueCancelDays)||3))});setOverdueCancelDays(result.overdue_cancel_days)}catch(e){setError(e instanceof Error?e.message:'Ошибка сохранения настроек')}finally{setSavingSettings(false)}}
