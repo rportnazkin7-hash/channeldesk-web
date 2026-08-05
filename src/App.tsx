@@ -6,7 +6,7 @@ import Analytics from './Analytics'
 import AdCampaignFlow from './AdCampaignFlow'
 import CampaignDashboard from './CampaignDashboard'
 
-const APP_VERSION = 'v0.38.0'
+const APP_VERSION = 'v0.39.0'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 type DeleteJob = Awaited<ReturnType<typeof api.deletePostFromTelegramStatus>>
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}

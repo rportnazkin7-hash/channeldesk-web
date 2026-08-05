@@ -123,9 +123,10 @@ select.field option{background:var(--panel);color:var(--text)}
 .campaign-dashboard-metrics span{display:block;color:var(--muted-2);font-size:9px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .campaign-dashboard-metrics b{display:block;margin-top:5px;color:var(--text);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
 .campaign-green{color:var(--accent-2)!important}.campaign-yellow{color:var(--warn)!important}.campaign-blue{color:#7dd3fc!important}
-.campaign-dashboard-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:12px}
+.campaign-dashboard-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin-top:12px}
 .campaign-dashboard-steps span{padding:7px 2px;border-bottom:2px solid var(--border-2);color:var(--muted-2);font-size:9px;text-align:center;white-space:nowrap}
 .campaign-dashboard-steps span.done{border-color:var(--accent);color:var(--accent-2)}
+.campaign-dashboard-steps span.current{border-color:var(--warn);color:var(--warn)}
 .campaign-dashboard-card{margin-top:10px;padding:11px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2)}
 .campaign-dashboard-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .campaign-dashboard-card-head strong{font-size:12px}.campaign-dashboard-card-head span{color:var(--muted-2);font-size:10px}
