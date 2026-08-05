@@ -62,6 +62,7 @@ export const api={
  acceptInvite:(token:string)=>req<{workspace_id:number;workspace_name:string;role:string}>(`/api/invites/accept`,{method:'POST',body:JSON.stringify({token})}),
  audit:(wid:number)=>req<AuditEntry[]>(`/api/workspaces/${wid}/audit`),
  posts:(wid:number)=>req<Post[]>(`/api/workspaces/${wid}/posts`),
+ getPost:(wid:number,id:number)=>req<{post:Post;latest_version:Version|null}>(`/api/workspaces/${wid}/posts/${id}`),
  createPost:(wid:number,p:{title:string;text:string;channel_id:number|null;buttons?:Button[][]})=>req<Post>(`/api/workspaces/${wid}/posts`,{method:'POST',body:JSON.stringify(p)}),
  updatePost:(wid:number,id:number,p:{title?:string;text?:string;channel_id?:number|null;buttons?:Button[][]})=>req<Post>(`/api/workspaces/${wid}/posts/${id}`,{method:'PATCH',body:JSON.stringify(p)}),
  submitPost:(wid:number,id:number)=>req<Post>(`/api/workspaces/${wid}/posts/${id}/submit`,{method:'POST'}),

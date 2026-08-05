@@ -9,7 +9,7 @@ client = TestClient(app)
 def test_health_version():
     r = client.get('/api/health')
     assert r.status_code == 200
-    assert r.json()['version'] == '0.32.0'
+    assert r.json()['version'] == '0.34.0'
 
 
 def test_health_migrations_route(monkeypatch):

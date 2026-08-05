@@ -102,6 +102,34 @@ select.field option{background:var(--panel);color:var(--text)}
 .post-editor{padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--border)}
 .post-editor .primary-btn{margin-top:10px}
 
+/* ---------- Поток рекламной кампании ---------- */
+.campaign-flow{margin-top:4px}
+.campaign-flow-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.campaign-flow-head h2{margin:4px 0 0;font-size:18px;letter-spacing:-.3px}
+.campaign-stepper{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:14px 0 4px}
+.campaign-stepper span{padding:8px 3px;border-bottom:2px solid var(--border-2);color:var(--muted-2);font-size:10px;text-align:center;white-space:nowrap}
+.campaign-stepper span.done,.campaign-stepper span.active{border-color:var(--accent);color:var(--accent-2)}
+.campaign-card{margin-top:12px;padding:13px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2)}
+.campaign-card-title{display:flex;align-items:center;justify-content:space-between;gap:9px;color:var(--text)}
+.campaign-card-title strong{font-size:13px}
+.campaign-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:10px;background:var(--accent-soft);color:var(--accent-2);font-size:17px}
+.campaign-form-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:2px}
+.campaign-hint{margin:6px 0 0;color:var(--muted-2);font-size:10px;line-height:1.4}
+.campaign-checkbox{display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--muted);font-size:11px}
+.campaign-checkbox input{width:17px;height:17px;accent-color:var(--accent)}
+.campaign-submit{margin-top:14px}
+.campaign-flow-actions{display:flex;align-items:center;gap:8px;margin-top:12px}
+.campaign-flow-actions .campaign-submit{flex:1;margin-top:0}
+.campaign-textarea{min-height:150px;resize:vertical;line-height:1.45}
+.campaign-chips{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:7px}
+.campaign-chips .btn-chip button{display:inline-flex;align-items:center;background:none;border:0;color:var(--danger);padding:0 1px;margin-left:3px}
+.campaign-success{border-color:var(--accent-border);background:linear-gradient(135deg,var(--accent-soft),var(--panel-2) 74%)}
+.campaign-success h3{margin:14px 0 0;font-size:19px}
+.campaign-check{display:flex;align-items:center;gap:7px;padding:9px 0;border-bottom:1px solid var(--border);color:var(--text-2);font-size:11px}
+.campaign-check:last-child{border-bottom:0}
+.campaign-check b{color:var(--accent-2);font-size:14px}
+@media(max-width:430px){.campaign-form-row{grid-template-columns:1fr}.campaign-flow-actions{align-items:stretch;flex-direction:column}.campaign-flow-actions .campaign-submit{width:100%}}
+
 /* ---------- Календарь ---------- */
 .cal-head{display:flex;align-items:center;justify-content:space-between;margin:2px 0 2px}
 .cal-head strong{font-size:14px;color:var(--text);letter-spacing:-.2px;font-variant-numeric:tabular-nums}

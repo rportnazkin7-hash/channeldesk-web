@@ -3,8 +3,9 @@ import { Activity,BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizont
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit,type Task } from './api'
 import Statistics from './Statistics'
 import Analytics from './Analytics'
+import AdCampaignFlow from './AdCampaignFlow'
 
-const APP_VERSION = 'v0.33.0'
+const APP_VERSION = 'v0.34.0'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 type DeleteJob = Awaited<ReturnType<typeof api.deletePostFromTelegramStatus>>
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
@@ -58,6 +59,7 @@ export default function App(){
  const [fabOpen,setFabOpen]=useState(false)
  const [showCompose,setShowCompose]=useState(false)
  const [showBookingForm,setShowBookingForm]=useState(false)
+ const [showCampaignFlow,setShowCampaignFlow]=useState(false)
  const active=spaces.find(x=>x.id===activeId)||spaces[0]||null
  const [showSettings,setShowSettings]=useState(false)
  const [confirmDelete,setConfirmDelete]=useState(false)
@@ -113,7 +115,7 @@ export default function App(){
  async function addButtonTo(id:number){buzz();if(!active||!btnText.trim()||!btnUrl.trim())return;if(!validButtonUrl(btnUrl)){setError('URL кнопки должен начинаться с https://, http:// или tg://');return}const w=active.id;try{const post=posts.find(p=>p.id===id);const cur=post?.buttons||[];const next=[...cur,[{text:btnText.trim(),url:btnUrl.trim()}]];await api.updatePost(w,id,{buttons:next});setBtnText('');setBtnUrl('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления кнопки')}}
  async function removeButtonFrom(postId:number,rowIndex:number,buttonIndex:number){buzz();if(!active)return;const post=posts.find(item=>item.id===postId);if(!post)return;const next=(post.buttons||[]).map((row,rowNo)=>row.filter((_,itemNo)=>rowNo!==rowIndex||itemNo!==buttonIndex)).filter(row=>row.length);try{await api.updatePost(active.id,postId,{buttons:next});await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления кнопки')}}
  async function useTemplate(t:Template){buzz();setNewTitle(t.title);setNewText(t.text);setFabOpen(false);setShowCompose(true);setTimeout(()=>{document.getElementById('draft-form')?.scrollIntoView({behavior:'smooth'})},80)}
- function openCreate(kind:'post'|'booking'|'task'|'advertiser'){buzz();setFabOpen(false);if(kind==='post'){setShowCompose(true);return}if(kind==='task'){setShowTasks(true);return}if(kind==='booking'){setShowBookingForm(true);return}setShowAdvForm(true)}
+ function openCreate(kind:'post'|'booking'|'task'|'advertiser'){buzz();setFabOpen(false);if(kind==='post'){setShowCompose(true);return}if(kind==='task'){setShowTasks(true);return}if(kind==='booking'){if(active)setShowCampaignFlow(true);else setError('Сначала создайте рабочее пространство');return}setShowAdvForm(true)}
  async function saveTemplate(){buzz();if(!active||!newTplName.trim())return;try{await api.createTemplate(active.id,{name:newTplName.trim(),title:newTitle,text:newText});setNewTplName('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка сохранения шаблона')}}
  async function delTemplate(id:number){buzz();if(!active)return;try{await api.deleteTemplate(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления шаблона')}}
  const canManage=active?.role==='owner'||active?.role==='admin'
@@ -228,7 +230,7 @@ export default function App(){
    </div>)}
   </section>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='overview'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='overview'&&<>
    {!active&&!loading?<section className="hero"><p>Создайте рабочее пространство агентства.</p><input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',marginBottom:12}}/><button onClick={create}><CirclePlus size={19}/> Создать</button></section>:<>
     <section className="hero"><span className="eyebrow">{active?.role}</span><p style={{marginTop:8}}>{active?.name}</p><div>{spaces.length>1&&<select value={active?.id} onChange={e=>{buzz();setActiveId(Number(e.target.value))}}>{spaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select>}</div></section>
     {pending.length>0&&<section className="panel" style={{marginTop:16}}><div className="panel-title"><h2>Обнаруженные каналы</h2><Radio size={20}/></div>{pending.map(p=><article key={p.id} style={{padding:'14px 0',borderBottom:'1px solid var(--border)'}}><strong>{p.title}</strong><p style={{color:'var(--muted)',fontSize:12}}>{p.bot_permissions.can_post_messages?'Публикация разрешена':'Нет права публикации'}</p><button onClick={()=>connect(p.id)} disabled={!p.bot_permissions.can_post_messages}>Подключить</button></article>)}</section>}
@@ -249,7 +251,7 @@ export default function App(){
    </>}
   </>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='calendar'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='calendar'&&<>
    {!active?<section className="panel"><div className="empty"><div className="empty-icon"><CalendarDays/></div><h3>Создайте рабочее пространство</h3><p>Календарь публикаций появится после создания пространства и подключения канала.</p></div></section>:<>
     <section className="panel">
      <div className="cal-head">
@@ -274,7 +276,7 @@ export default function App(){
    </>}
   </>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='ads'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='ads'&&<>
    {!active?<section className="panel"><div className="empty"><div className="empty-icon"><Megaphone/></div><h3>Создайте рабочее пространство</h3><p>Раздел клиентов появится после создания пространства.</p></div></section>:<>
     <section className="panel"><div className="panel-title"><h2>Клиенты</h2><Users size={20}/></div>
      <p style={{color:'var(--muted)',fontSize:12,margin:'4px 0 0'}}>Рекламодатели и размещения. Создание — через «+» внизу.</p>
@@ -324,6 +326,8 @@ export default function App(){
     </section>
    </>}
   </>}
+
+  {showCampaignFlow&&active&&<AdCampaignFlow workspaceId={active.id} channels={channels} advertisers={advertisers} onBack={()=>{buzz();setShowCampaignFlow(false)}} onDone={()=>{setShowCampaignFlow(false);setTab('calendar');void load()}} onError={setError}/>}
 
   {showCompose&&<section id="draft-form" className="panel">
    <div className="panel-title"><h2>Новый пост</h2><FileText size={20}/></div>
@@ -496,7 +500,7 @@ export default function App(){
   {showAnalytics&&active&&<Analytics workspaceId={active.id} channels={channels} onBack={()=>{buzz();setShowAnalytics(false)}} onError={setError}/>}
   {showStatistics&&active&&<Statistics workspaceId={active.id} onBack={()=>{buzz();setShowStatistics(false)}} onExport={(format,year,month)=>sendExport('finance',format,{year,month})} onError={setError}/>}
 
-  {!showStatistics&&!showAnalytics&&!showMediaKits&&!showTasks&&!showCompose&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='more'&&<section className="panel"><div className="panel-title"><h2>Ещё</h2><MoreHorizontal size={20}/></div>
+  {!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showMediaKits&&!showTasks&&!showCompose&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='more'&&<section className="panel"><div className="panel-title"><h2>Ещё</h2><MoreHorizontal size={20}/></div>
    {[
     {icon:Megaphone,label:'Каналы',desc:'Управление подключёнными каналами',action:()=>goSection('channels-section')},
     {icon:Users,label:'Команда',desc:'Участники и приглашения',action:()=>goSection('team-section')},
