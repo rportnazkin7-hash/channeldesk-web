@@ -61,6 +61,8 @@ export default function App(){
  const [showBookingForm,setShowBookingForm]=useState(false)
  const [showCampaignFlow,setShowCampaignFlow]=useState(false)
  const active=spaces.find(x=>x.id===activeId)||spaces[0]||null
+ function closeSubviews(){setFabOpen(false);setShowCompose(false);setShowBookingForm(false);setShowCampaignFlow(false);setShowAdvForm(false);setShowTasks(false);setShowMediaKits(false);setShowStatistics(false);setShowAnalytics(false);setShowSettings(false)}
+ function navigate(next:Tab){buzz();closeSubviews();setTab(next)}
  const [showSettings,setShowSettings]=useState(false)
  const [confirmDelete,setConfirmDelete]=useState(false)
  const [overdueCancelDays,setOverdueCancelDays]=useState(3),[savingSettings,setSavingSettings]=useState(false)
@@ -101,7 +103,7 @@ export default function App(){
  async function connect(id:number){buzz();if(!active)return;try{await api.connect(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка подключения')}}
  async function makeInvite(){buzz();if(!active)return;setError('');try{const iv=await api.createInvite(active.id,'editor');setInvite(iv);setCopied(false)}catch(e){setError(e instanceof Error?e.message:'Ошибка создания приглашения')}}
  async function copyInvite(){buzz();if(!invite)return;try{await navigator.clipboard.writeText(invite.token);setCopied(true)}catch{setCopied(false)}}
- function goSection(id:string){buzz();setTab('overview');setTimeout(()=>{document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'})},80)}
+ function goSection(id:string){buzz();closeSubviews();setTab('overview');setTimeout(()=>{document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'})},80)}
  async function createDraft(){buzz();if(!active)return;setBusy(true);setError('');try{const post=await api.createPost(active.id,{title:newTitle,text:newText,channel_id:draftChannel,buttons:draftBtns.length?[draftBtns]:[]});for(const f of draftFiles){const ticket=await api.uploadTicket(active.id,{post_id:post.id,file_name:f.name,content_type:f.type||'application/octet-stream',size:f.size});await api.uploadDirect(ticket,f)}setNewTitle('');setNewText('');setDraftChannel(null);setDraftBtns([]);setDraftFiles([]);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания черновика')}finally{setBusy(false)}}
  function addDraftBtn(){buzz();const t=draftBtnText.trim(),u=draftBtnUrl.trim();if(!t||!u)return;if(!validButtonUrl(u)){setError('URL кнопки должен начинаться с https://, http:// или tg://');return}setDraftBtns([...draftBtns,{text:t,url:u}]);setDraftBtnText('');setDraftBtnUrl('')}
  function pickFiles(list:FileList|null){if(!list)return;setDraftFiles([...draftFiles,...Array.from(list)].slice(0,10))}
@@ -189,10 +191,10 @@ export default function App(){
     </div>}
     {editable&&<div style={{marginBottom:12}}>
      <strong style={{fontSize:13}}>Кнопка (URL)</strong>
-     <div style={{display:'flex',gap:8,marginTop:8}}>
-      <input placeholder="Текст кнопки" value={btnText} onChange={e=>setBtnText(e.target.value)} style={{flex:1,padding:10,borderRadius:10,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',fontSize:13}}/>
-      <input placeholder="https://" value={btnUrl} onChange={e=>setBtnUrl(e.target.value)} style={{flex:1.5,padding:10,borderRadius:10,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',fontSize:13}}/>
-      <button onClick={()=>addButtonTo(p.id)} disabled={busy||!btnText.trim()||!btnUrl.trim()}><Plus size={15}/></button>
+     <div className="post-button-form">
+      <input className="field" placeholder="Текст кнопки" value={btnText} onChange={e=>setBtnText(e.target.value)}/>
+      <input className="field" placeholder="https://" value={btnUrl} onChange={e=>setBtnUrl(e.target.value)}/>
+      <button className="icon-btn" onClick={()=>addButtonTo(p.id)} disabled={busy||!btnText.trim()||!btnUrl.trim()}><Plus size={15}/></button>
      </div>
     </div>}
     <div style={{marginBottom:12}}>
@@ -332,7 +334,7 @@ export default function App(){
 
   {showCompose&&<section id="draft-form" className="panel">
    <div className="panel-title"><h2>Новый пост</h2><FileText size={20}/></div>
-   <button className="icon-btn" onClick={()=>{buzz();setShowCompose(false)}} style={{marginBottom:10}}>← Назад</button>
+   <button className="back-btn" onClick={()=>{buzz();setShowCompose(false)}} style={{marginBottom:10}}>← Назад</button>
    {!active?<>
     <p style={{color:'var(--muted)',fontSize:13}}>Создайте рабочее пространство, чтобы публиковать посты.</p>
     <input className="field" placeholder="Название пространства" value={name} onChange={e=>setName(e.target.value)}/>
@@ -364,7 +366,7 @@ export default function App(){
 
       {showSettings&&<section className="panel">
    <div className="panel-title"><h2>Настройки</h2><Settings size={20}/></div>
-   <button className="icon-btn" onClick={()=>{buzz();setShowSettings(false)}} style={{marginBottom:10}}>← Назад</button>
+   <button className="back-btn" onClick={()=>{buzz();setShowSettings(false)}} style={{marginBottom:10}}>← Назад</button>
    {active?<>
     <div style={{fontSize:13,color:'var(--muted)'}}>Рабочее пространство</div>
     <p style={{margin:'8px 0 0',fontSize:16,fontWeight:700}}>{active.name}</p>
@@ -391,7 +393,7 @@ export default function App(){
 
 {showBookingForm&&<section className="panel">
    <div className="panel-title"><h2>Новая бронь</h2><Megaphone size={20}/></div>
-   <button className="icon-btn" onClick={()=>{buzz();setShowBookingForm(false)}} style={{marginBottom:10}}>← Назад</button>
+   <button className="back-btn" onClick={()=>{buzz();setShowBookingForm(false)}} style={{marginBottom:10}}>← Назад</button>
    <label className="form-label">Рекламодатель</label>
    <select className="field" value={bkAdv??''} onChange={e=>setBkAdv(e.target.value?Number(e.target.value):null)}>
     <option value="">— выберите —</option>
@@ -424,7 +426,7 @@ export default function App(){
 
   {showAdvForm&&<section className="panel">
    <div className="panel-title"><h2>Новый рекламодатель</h2><Users size={20}/></div>
-   <button className="icon-btn" onClick={()=>{buzz();setShowAdvForm(false)}} style={{marginBottom:10}}>← Назад</button>
+   <button className="back-btn" onClick={()=>{buzz();setShowAdvForm(false)}} style={{marginBottom:10}}>← Назад</button>
    <label className="form-label">Название / компания</label>
    <input className="field" placeholder="ООО Реклама" value={advName} onChange={e=>setAdvName(e.target.value)}/>
    <label className="form-label">Контакты</label>
@@ -434,7 +436,7 @@ export default function App(){
 
 {showTasks&&<section className="panel">
    <div className="panel-title"><h2>Задачи</h2><CheckCircle2 size={20}/></div>
-   <button className="icon-btn" onClick={()=>{buzz();setShowTasks(false)}} style={{marginBottom:12}}>← Назад</button>
+   <button className="back-btn" onClick={()=>{buzz();setShowTasks(false)}} style={{marginBottom:12}}>← Назад</button>
    <label className="form-label">Новая задача</label>
    <input className="field" placeholder="Что нужно сделать?" value={taskTitle} onChange={e=>setTaskTitle(e.target.value)}/>
    <textarea className="field" rows={2} placeholder="Описание…" value={taskDesc} onChange={e=>setTaskDesc(e.target.value)} style={{marginTop:10}}/>
@@ -466,7 +468,7 @@ export default function App(){
 
   {showMediaKits&&<section className="panel">
    <div className="panel-title"><h2>Медиакиты</h2><ImageIcon size={20}/></div>
-   <button className="icon-btn" onClick={()=>{buzz();setShowMediaKits(false)}} style={{marginBottom:12}}>← Назад</button>
+   <button className="back-btn" onClick={()=>{buzz();setShowMediaKits(false)}} style={{marginBottom:12}}>← Назад</button>
    <label className="form-label">Название</label>
    <input className="field" placeholder="Медиакит канала «Новости»" value={mkName} onChange={e=>setMkName(e.target.value)}/>
    <label className="form-label">Канал</label>
@@ -523,11 +525,11 @@ export default function App(){
 
   <div className="ver">ChannelDesk {APP_VERSION}</div>
  </main><nav>
-  <button className={tab==='overview'?'active':''} onClick={()=>{buzz();setTab('overview')}}><BarChart3 size={21}/><span>Обзор</span></button>
-  <button className={tab==='calendar'?'active':''} onClick={()=>{buzz();setTab('calendar')}}><CalendarDays size={21}/><span>Календарь</span></button>
+  <button className={tab==='overview'?'active':''} onClick={()=>navigate('overview')}><BarChart3 size={21}/><span>Обзор</span></button>
+  <button className={tab==='calendar'?'active':''} onClick={()=>navigate('calendar')}><CalendarDays size={21}/><span>Календарь</span></button>
   <button className="fab" onClick={()=>{buzz();setFabOpen(!fabOpen)}} title="Создать"><CirclePlus size={26}/><span>Создать</span></button>
-  <button className={tab==='ads'?'active':''} onClick={()=>{buzz();setTab('ads')}}><Megaphone size={21}/><span>Клиенты</span></button>
-  <button className={tab==='more'?'active':''} onClick={()=>{buzz();setTab('more')}}><MoreHorizontal size={21}/><span>Ещё</span></button>
+  <button className={tab==='ads'?'active':''} onClick={()=>navigate('ads')}><Megaphone size={21}/><span>Клиенты</span></button>
+  <button className={tab==='more'?'active':''} onClick={()=>navigate('more')}><MoreHorizontal size={21}/><span>Ещё</span></button>
  </nav>
  {fabOpen&&<div className="fab-overlay" onClick={()=>setFabOpen(false)}>
   <div className="fab-sheet" onClick={e=>e.stopPropagation()}>

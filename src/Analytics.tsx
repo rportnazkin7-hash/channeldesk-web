@@ -70,7 +70,7 @@ export default function Analytics({ workspaceId, channels, onBack, onError }: Pr
       <button className="icon-btn" onClick={() => void load()} disabled={loading} title="Обновить"><RefreshCw size={14} /></button>
     </div>
     <p className="analytics-note">Здесь только автоматические данные, которые Telegram отдаёт нашему боту. Никаких ручных таблиц: бот сам считает новые посты, реакции и подписчиков.</p>
-    <button className="analytics-back" onClick={onBack}>← Назад</button>
+    <button className="back-btn" onClick={onBack}>← Назад</button>
 
     <div className="analytics-filters">
       <label className="analytics-control"><span>Период от</span><input className="field" type="date" value={fromDate} onChange={event => setFromDate(event.target.value)} /></label>

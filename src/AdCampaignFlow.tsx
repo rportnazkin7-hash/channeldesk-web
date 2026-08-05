@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, ArrowRight, CheckCircle2, FileText, Link2, Paperclip, Plus, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, Link2, Paperclip, Plus, X } from 'lucide-react'
 import { api, type Advertiser, type Asset, type Booking, type Button, type Channel, type Post } from './api'
 
 type Props = {
@@ -158,7 +158,7 @@ export default function AdCampaignFlow({ workspaceId, channels, advertisers, onB
   }
 
   return <section className="panel campaign-flow">
-    <div className="campaign-flow-head"><div><span className="eyebrow">НОВАЯ КАМПАНИЯ</span><h2>{step === 1 ? 'Рекламная бронь' : step === 2 ? 'Рекламный пост' : 'Проверка публикации'}</h2></div><button className="icon-btn" onClick={onBack}><X size={16} /></button></div>
+    <div className="campaign-flow-head"><div><span className="eyebrow">НОВАЯ КАМПАНИЯ</span><h2>{step === 1 ? 'Рекламная бронь' : step === 2 ? 'Рекламный пост' : 'Проверка публикации'}</h2></div><button className="back-btn" onClick={onBack}>← Назад</button></div>
     <div className="campaign-stepper"><span className={step >= 1 ? 'done' : ''}>1. Бронь{step > 1 ? ' ✓' : ''}</span><span className={step >= 2 ? 'active' : ''}>2. Пост{step > 2 ? ' ✓' : ''}</span><span className={step >= 3 ? 'active' : ''}>3. Проверка</span></div>
 
     {step === 1 && <>
@@ -185,7 +185,7 @@ export default function AdCampaignFlow({ workspaceId, channels, advertisers, onB
         <div className="campaign-form-row" style={{marginTop:8}}><input className="field" placeholder="Текст кнопки" value={buttonText} onChange={event => setButtonText(event.target.value)} /><input className="field" placeholder="https://..." value={buttonUrl} onChange={event => setButtonUrl(event.target.value)} /><button className="icon-btn" onClick={addButton} disabled={!buttonText.trim() || !buttonUrl.trim()}><Plus size={15} /></button></div>
       </div>
       <div className="campaign-card"><div className="campaign-card-title"><strong>Кампания</strong><span className="status status-review">Ожидает оплаты</span></div><p className="campaign-hint">{advertiser?.name || 'Рекламодатель'} · {channel?.title || 'Канал'} · {formatDate(booking?.publish_at || null)}</p></div>
-      <div className="campaign-flow-actions"><button className="icon-btn" onClick={() => setStep(1)}><ArrowLeft size={15} /> Назад</button><button className="primary-btn campaign-submit" onClick={() => void savePost()} disabled={saving}><ArrowRight size={16} /> {saving ? 'Сохраняю…' : 'Сохранить и проверить'}</button></div>
+      <div className="campaign-flow-actions"><button className="back-btn" onClick={() => setStep(1)}><ArrowLeft size={15} /> Назад</button><button className="primary-btn campaign-submit" onClick={() => void savePost()} disabled={saving}><ArrowRight size={16} /> {saving ? 'Сохраняю…' : 'Сохранить и проверить'}</button></div>
     </>}
 
     {step === 3 && <>

@@ -117,7 +117,7 @@ export default function Statistics({ workspaceId, onBack, onExport, onError }: P
         <RefreshCw size={14} />
       </button>
     </div>
-    <button className="icon-btn" onClick={onBack} style={{ margin: '10px 0 4px' }}>← Назад</button>
+    <button className="back-btn" onClick={onBack} style={{ margin: '10px 0 4px' }}>← Назад</button>
 
     <div className="period-picker">
       <button className="icon-btn" onClick={() => shiftPeriod(-1)} aria-label="Предыдущий месяц"><ChevronLeft size={15} /></button>
