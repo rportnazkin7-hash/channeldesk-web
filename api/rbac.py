@@ -7,6 +7,7 @@ from fastapi import HTTPException
 MATRIX: dict[str, frozenset[str]] = {
     'workspace.view': frozenset({'owner','admin','editor','author','designer','ad_manager','analyst','viewer'}),
     'workspace.manage': frozenset({'owner','admin'}),
+    'api.manage': frozenset({'owner','admin'}),
 
     'members.view': frozenset({'owner','admin','editor','analyst'}),
     'members.manage': frozenset({'owner','admin'}),

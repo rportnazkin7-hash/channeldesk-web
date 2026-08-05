@@ -1,5 +1,5 @@
 import { useCallback,useEffect,useRef,useState } from 'react'
-import { Activity,BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download } from 'lucide-react'
+import { Activity,BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download,Code2 } from 'lucide-react'
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit,type Task } from './api'
 import Statistics from './Statistics'
 import Analytics from './Analytics'
@@ -68,12 +68,14 @@ export default function App(){
  const [showMediaKits,setShowMediaKits]=useState(false)
  const [showStatistics,setShowStatistics]=useState(false)
  const [showAnalytics,setShowAnalytics]=useState(false)
+ const [showIntegrations,setShowIntegrations]=useState(false)
+ const [apiKeys,setApiKeys]=useState<Awaited<ReturnType<typeof api.apiKeys>>>([]),[webhooks,setWebhooks]=useState<Awaited<ReturnType<typeof api.webhooks>>>([]),[apiKeyName,setApiKeyName]=useState('Сайт'),[apiKeyCanRequestPublish,setApiKeyCanRequestPublish]=useState(false),[apiKeyToken,setApiKeyToken]=useState(''),[webhookName,setWebhookName]=useState(''),[webhookUrl,setWebhookUrl]=useState(''),[webhookSecret,setWebhookSecret]=useState(''),[integrationsBusy,setIntegrationsBusy]=useState(false)
  const [fabOpen,setFabOpen]=useState(false)
  const [showCompose,setShowCompose]=useState(false)
  const [showBookingForm,setShowBookingForm]=useState(false)
  const [showCampaignFlow,setShowCampaignFlow]=useState(false)
  const active=spaces.find(x=>x.id===activeId)||spaces[0]||null
- function closeSubviews(){setFabOpen(false);setShowCompose(false);setShowBookingForm(false);setShowCampaignFlow(false);setShowAdvForm(false);setShowTasks(false);setShowMediaKits(false);setShowStatistics(false);setShowAnalytics(false);setShowSettings(false)}
+ function closeSubviews(){setFabOpen(false);setShowCompose(false);setShowBookingForm(false);setShowCampaignFlow(false);setShowAdvForm(false);setShowTasks(false);setShowMediaKits(false);setShowStatistics(false);setShowAnalytics(false);setShowIntegrations(false);setShowSettings(false)}
  function navigate(next:Tab){buzz();closeSubviews();setTab(next)}
  const [showSettings,setShowSettings]=useState(false)
  const [confirmDelete,setConfirmDelete]=useState(false)
@@ -93,8 +95,14 @@ export default function App(){
  const refresh=useCallback(async ()=>{if(refreshInFlight.current)return;refreshInFlight.current=true;try{const s=await api.workspaces();const a=s.find(x=>x.id===activeId)||s[0]||null;if(!a)return;const [p,c,m,po,t,ad,bk,fb,fs,mk,ts]=await Promise.all([api.pending(),api.channels(a.id),api.members(a.id),api.posts(a.id),api.templates(a.id),api.advertisers(a.id),api.bookings(a.id),api.publicReportFeedback(a.id),api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1),api.mediaKits(a.id),api.tasks(a.id)]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFeedbackItems(fb);setFinSummary(fs);setMediaKits(mk);setTasks(ts);setSpaces(s)}catch{/* фоновая ошибка не должна тревожить пользователя */}finally{refreshInFlight.current=false}},[activeId])
  useEffect(()=>{const timer=setInterval(()=>{refresh()},15000);return ()=>clearInterval(timer)},[refresh])
  useEffect(()=>{if(!showSettings||!active)return;api.workspaceSettings(active.id).then(settings=>setOverdueCancelDays(settings.overdue_cancel_days)).catch(e=>setError(e instanceof Error?e.message:'Ошибка загрузки настроек'))},[showSettings,active?.id])
+ useEffect(()=>{if(!showIntegrations||!active)return;void loadIntegrations()},[showIntegrations,active?.id])
  useEffect(()=>{if(!deletePostId||!deleteJob||deleteJob.status==='done'||deleteJob.status==='failed')return;const timer=setInterval(()=>{void checkDeleteStatus(deletePostId)},5000);return ()=>clearInterval(timer)},[deletePostId,deleteJob?.status,active?.id])
  async function saveWorkspaceSettings(){if(!active)return;setSavingSettings(true);setError('');try{const result=await api.updateWorkspaceSettings(active.id,{overdue_cancel_days:Math.max(1,Math.min(30,Number(overdueCancelDays)||3))});setOverdueCancelDays(result.overdue_cancel_days)}catch(e){setError(e instanceof Error?e.message:'Ошибка сохранения настроек')}finally{setSavingSettings(false)}}
+ async function loadIntegrations(){if(!active)return;try{const [keys,hooks]=await Promise.all([api.apiKeys(active.id),api.webhooks(active.id)]);setApiKeys(keys);setWebhooks(hooks)}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки интеграций')}}
+ async function createApiKey(){buzz();if(!active||!apiKeyName.trim())return;setIntegrationsBusy(true);setError('');try{const scopes=['drafts:create','posts:read','channels:read',...(apiKeyCanRequestPublish?['publish:request']:[])];const created=await api.createApiKey(active.id,{name:apiKeyName.trim(),scopes});setApiKeyToken(created.token);setApiKeyName('');setApiKeyCanRequestPublish(false);await loadIntegrations()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания API-ключа')}finally{setIntegrationsBusy(false)}}
+ async function revokeApiKey(id:number){buzz();if(!active||!window.confirm('Отозвать API-ключ? Интеграция перестанет работать.'))return;try{await api.revokeApiKey(active.id,id);await loadIntegrations()}catch(e){setError(e instanceof Error?e.message:'Ошибка отзыва API-ключа')}}
+ async function createWebhook(){buzz();if(!active||!webhookName.trim()||!webhookUrl.trim()){setError('Заполните название и URL webhook-а');return}setIntegrationsBusy(true);setError('');try{const created=await api.createWebhook(active.id,{name:webhookName.trim(),url:webhookUrl.trim(),events:['post.created','post.submitted']});setWebhookSecret(created.secret);setWebhookName('');setWebhookUrl('');await loadIntegrations()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания webhook-а')}finally{setIntegrationsBusy(false)}}
+ async function deleteWebhook(id:number){buzz();if(!active)return;try{await api.deleteWebhook(active.id,id);await loadIntegrations()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления webhook-а')}}
  async function addAdvertiser(){buzz();if(!active)return;setError('');try{await api.createAdvertiser(active.id,{name:advName,notes:advContact});setAdvName('');setAdvContact('');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка добавления рекламодателя')}}
  async function delAdvertiser(id:number){buzz();if(!active)return;try{await api.deleteAdvertiser(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления рекламодателя')}}
  async function createAdvertiserReport(id:number){buzz();if(!active)return;setReportBusy(true);setError('');try{const r=await api.createPublicReport(active.id,id,30);const full=`${window.location.origin}${r.path}`;setReportUrl(full);setReportExpires(r.expires_at);try{await navigator.clipboard.writeText(full)}catch{void 0}}catch(e){setError(e instanceof Error?e.message:'Ошибка создания публичного отчёта')}finally{setReportBusy(false)}}
@@ -256,7 +264,7 @@ export default function App(){
    </div>)}
   </section>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='overview'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&!showIntegrations&&tab==='overview'&&<>
    {!active&&!loading?<section className="hero"><p>Создайте рабочее пространство агентства.</p><input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',marginBottom:12}}/><button onClick={create}><CirclePlus size={19}/> Создать</button></section>:<>
     <section className="hero"><span className="eyebrow">{active?.role}</span><p style={{marginTop:8}}>{active?.name}</p><div>{spaces.length>1&&<select value={active?.id} onChange={e=>{buzz();setActiveId(Number(e.target.value))}}>{spaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select>}</div></section>
     {pending.length>0&&<section className="panel" style={{marginTop:16}}><div className="panel-title"><h2>Обнаруженные каналы</h2><Radio size={20}/></div>{pending.map(p=><article key={p.id} style={{padding:'14px 0',borderBottom:'1px solid var(--border)'}}><strong>{p.title}</strong><p style={{color:'var(--muted)',fontSize:12}}>{p.bot_permissions.can_post_messages?'Публикация разрешена':'Нет права публикации'}</p><button onClick={()=>connect(p.id)} disabled={!p.bot_permissions.can_post_messages}>Подключить</button></article>)}</section>}
@@ -277,7 +285,7 @@ export default function App(){
    </>}
   </>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='posts'&&<section className="panel posts-view">
+  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&!showIntegrations&&tab==='posts'&&<section className="panel posts-view">
    <div className="posts-view-head"><div><span className="eyebrow">КОНТЕНТ</span><h2>Посты</h2></div><FileText size={20}/></div>
    <div className="posts-filters"><input className="field" placeholder="Поиск по постам…" value={postsQuery} onChange={e=>setPostsQuery(e.target.value)}/><select className="field" value={postsChannel??''} onChange={e=>setPostsChannel(e.target.value?Number(e.target.value):null)}><option value="">Все каналы</option>{channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}</select></div>
    <div className="posts-status-filter">{(['all','draft','review','scheduled','published'] as const).map(status=><button key={status} className={postsStatus===status?'active':''} onClick={()=>{buzz();setPostsStatus(status)}}>{status==='all'?'Все':status==='draft'?'Черновики':status==='review'?'Согласование':status==='scheduled'?'Запланированы':'Опубликованы'}</button>)}</div>
@@ -285,7 +293,7 @@ export default function App(){
    {postsView.length?postsView.map(renderPostCard):<div className="empty"><p>Постов по выбранным фильтрам нет.</p><button className="primary-btn" onClick={()=>{buzz();setFabOpen(true)}}>Создать пост</button></div>}
   </section>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='ads'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&!showIntegrations&&tab==='ads'&&<>
    {!active?<section className="panel"><div className="empty"><div className="empty-icon"><Megaphone/></div><h3>Создайте рабочее пространство</h3><p>Раздел клиентов появится после создания пространства.</p></div></section>:<>
     <section className="panel"><div className="panel-title"><h2>Клиенты</h2><Users size={20}/></div>
      <p style={{color:'var(--muted)',fontSize:12,margin:'4px 0 0'}}>Рекламодатели и размещения. Создание — через «+» внизу.</p>
@@ -395,6 +403,31 @@ export default function App(){
     {draftFiles.length>0&&<div className="chip-wrap">{draftFiles.map((f,i)=><span key={i} className="btn-chip">📎 {f.name.length>22?f.name.slice(0,22)+'…':f.name} <button onClick={()=>{buzz();setDraftFiles(draftFiles.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'var(--danger)',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
     <div style={{marginTop:14}}><span style={{color:'var(--muted)',fontSize:12}}>Шаблоны: </span>{templates.length?templates.map(t=><button key={t.id} onClick={()=>useTemplate(t)} disabled={busy} className="chip-btn">{t.name}</button>):<span style={{color:'var(--muted-2)',fontSize:12}}>нет</span>}</div>
     <button className="primary-btn" onClick={createDraft} disabled={busy||!newTitle.trim()}><CirclePlus size={18}/> Создать черновик {draftFiles.length?`(${draftFiles.length} вл.)`:''}</button>
+   </>}
+  </section>}
+
+  {showIntegrations&&<section className="panel">
+   <div className="panel-title"><h2>Интеграции</h2><Code2 size={20}/></div>
+   <button className="back-btn" onClick={()=>{buzz();setShowIntegrations(false)}} style={{marginBottom:12}}>← Назад</button>
+   {!active?<p style={{color:'var(--muted)'}}>Сначала создайте рабочее пространство.</p>:!canManage?<p style={{color:'var(--muted)'}}>Управлять интеграциями может только владелец или администратор.</p>:<>
+    <div className="campaign-card">
+     <div className="campaign-card-title"><strong>Partner API</strong><Code2 size={18}/></div>
+     <p className="campaign-hint">Подключайте сайт, форму или CRM. По умолчанию внешний сервис может только создавать черновики и читать их статус.</p>
+     <label className="form-label">Название API-ключа</label>
+     <div className="btn-row"><input className="field" value={apiKeyName} onChange={e=>setApiKeyName(e.target.value)} placeholder="Например, сайт редакции"/><button className="primary-btn" onClick={()=>void createApiKey()} disabled={integrationsBusy||!apiKeyName.trim()}>{integrationsBusy?'Создаю…':'Создать ключ'}</button></div>
+     <label className="campaign-checkbox" style={{marginTop:10}}><input type="checkbox" checked={apiKeyCanRequestPublish} onChange={e=>setApiKeyCanRequestPublish(e.target.checked)}/><span>Разрешить только запрашивать публикацию после проверки</span></label>
+     {apiKeyToken&&<div className="invite-box"><p><strong>Скопируйте ключ сейчас — повторно он не покажется.</strong></p><code>{apiKeyToken}</code><button className="icon-btn" style={{marginTop:8}} onClick={()=>{buzz();navigator.clipboard?.writeText(apiKeyToken)}}>Скопировать</button></div>}
+     <div style={{marginTop:14}}>{apiKeys.length===0?<p className="campaign-hint">Ключей пока нет.</p>:apiKeys.map(key=><div key={key.id} style={{padding:'10px 0',borderTop:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}><div><strong style={{fontSize:13}}>{key.name}</strong><div style={{fontSize:11,color:'var(--muted-2)'}}>{key.key_prefix} · {key.revoked_at?'отозван':'активен'}</div></div>{!key.revoked_at&&<button className="icon-btn danger" onClick={()=>void revokeApiKey(key.id)}>Отозвать</button>}</div>)}</div>
+    </div>
+    <div className="campaign-card" style={{marginTop:12}}>
+     <div className="campaign-card-title"><strong>Webhooks</strong><Link2 size={18}/></div>
+     <p className="campaign-hint">ChannelDesk отправит событие на ваш URL при создании черновика через Partner API или его отправке на согласование.</p>
+     <label className="form-label">Название</label><input className="field" value={webhookName} onChange={e=>setWebhookName(e.target.value)} placeholder="CRM редакции"/>
+     <label className="form-label">URL</label><input className="field" value={webhookUrl} onChange={e=>setWebhookUrl(e.target.value)} placeholder="https://example.com/channeldesk/webhook"/>
+     <button className="primary-btn" style={{marginTop:10}} onClick={()=>void createWebhook()} disabled={integrationsBusy||!webhookName.trim()||!webhookUrl.trim()}>Создать webhook</button>
+     {webhookSecret&&<div className="invite-box"><p><strong>Секрет подписи webhook-а:</strong></p><code>{webhookSecret}</code><button className="icon-btn" style={{marginTop:8}} onClick={()=>{buzz();navigator.clipboard?.writeText(webhookSecret)}}>Скопировать секрет</button></div>}
+     <div style={{marginTop:14}}>{webhooks.length===0?<p className="campaign-hint">Webhook-ов пока нет.</p>:webhooks.map(hook=><div key={hook.id} style={{padding:'10px 0',borderTop:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}><div style={{minWidth:0}}><strong style={{fontSize:13}}>{hook.name}</strong><div style={{fontSize:11,color:'var(--muted-2)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{hook.url}</div></div>{hook.is_active&&<button className="icon-btn danger" onClick={()=>void deleteWebhook(hook.id)}>Отключить</button>}</div>)}</div>
+    </div>
    </>}
   </section>}
 
@@ -537,7 +570,7 @@ export default function App(){
   {showAnalytics&&active&&<Analytics workspaceId={active.id} channels={channels} onBack={()=>{buzz();setShowAnalytics(false)}} onError={setError}/>}
   {showStatistics&&active&&<Statistics workspaceId={active.id} onBack={()=>{buzz();setShowStatistics(false)}} onExport={(format,year,month)=>sendExport('finance',format,{year,month})} onError={setError}/>}
 
-  {!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showMediaKits&&!showTasks&&!showCompose&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='more'&&<section className="panel"><div className="panel-title"><h2>Ещё</h2><MoreHorizontal size={20}/></div>
+  {!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showMediaKits&&!showTasks&&!showCompose&&!showBookingForm&&!showAdvForm&&!showSettings&&!showIntegrations&&tab==='more'&&<section className="panel"><div className="panel-title"><h2>Ещё</h2><MoreHorizontal size={20}/></div>
    {[
     {icon:Megaphone,label:'Каналы',desc:'Управление подключёнными каналами',action:()=>goSection('channels-section')},
     {icon:Users,label:'Команда',desc:'Участники и приглашения',action:()=>goSection('team-section')},
@@ -546,6 +579,7 @@ export default function App(){
     {icon:LineChart,label:'Статистика',desc:'Доходы, расходы, прибыль и отчёты',action:()=>{buzz();if(active)setShowStatistics(true);else setError('Сначала создайте рабочее пространство')}},
     {icon:Activity,label:'Аналитика каналов',desc:'Охват, просмотры, ссылки и метрики',action:()=>{buzz();if(active)setShowAnalytics(true);else setError('Сначала создайте рабочее пространство')}},
     {icon:ImageIcon,label:'Медиакиты',desc:'Презентация для рекламодателей',action:()=>{buzz();setShowMediaKits(true)}},
+    {icon:Code2,label:'Интеграции',desc:'API и webhook-и для сайтов и CRM',action:()=>{buzz();if(active)setShowIntegrations(true);else setError('Сначала создайте рабочее пространство')}},
     {icon:Settings,label:'Настройки',desc:'Пространство и уведомления',action:()=>{buzz();setShowSettings(true)}},
    ].map(item=>{
     const I=item.icon

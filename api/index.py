@@ -16,6 +16,7 @@ from api.reports import router as reports_router
 from api.tracking import router as tracking_router
 from api.slots import router as slots_router
 from api.exports import router as exports_router
+from api.partner_api import ui_router as integrations_router, partner_router
 
 
 @asynccontextmanager
@@ -38,7 +39,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title='ChannelDesk API', version='0.45.0', lifespan=lifespan)
 origins=[x.strip() for x in os.getenv('ALLOWED_ORIGINS','http://localhost:5173').split(',') if x.strip()]
-app.add_middleware(CORSMiddleware,allow_origins=origins,allow_credentials=False,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Content-Type','X-Telegram-Init-Data','X-Dev-Api-Key'])
+app.add_middleware(CORSMiddleware,allow_origins=origins,allow_credentials=False,allow_methods=['GET','POST','PATCH','DELETE','OPTIONS'],allow_headers=['Content-Type','Authorization','X-Telegram-Init-Data','X-Dev-Api-Key','Idempotency-Key'])
 app.include_router(workspaces_router)
 app.include_router(channels_router)
 app.include_router(posts_router)
@@ -51,6 +52,8 @@ app.include_router(reports_router)
 app.include_router(tracking_router)
 app.include_router(slots_router)
 app.include_router(exports_router)
+app.include_router(integrations_router)
+app.include_router(partner_router)
 
 @app.get('/api/health')
 def health():
