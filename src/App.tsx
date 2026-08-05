@@ -7,7 +7,7 @@ import AdCampaignFlow from './AdCampaignFlow'
 import CampaignDashboard from './CampaignDashboard'
 import AdCalendar from './AdCalendar'
 
-const APP_VERSION = 'v0.40.0'
+const APP_VERSION = 'v0.41.0'
 type Tab = 'overview'|'posts'|'ads'|'more'
 type ClientView = 'campaigns'|'calendar'
 type DeleteJob = Awaited<ReturnType<typeof api.deletePostFromTelegramStatus>>
@@ -280,7 +280,7 @@ export default function App(){
 
     <div className="client-view-switch"><button className={clientView==='campaigns'?'active':''} onClick={()=>{buzz();setClientView('campaigns')}}>Кампании</button><button className={clientView==='calendar'?'active':''} onClick={()=>{buzz();setClientView('calendar')}}>Рекламный календарь</button></div>
     {clientView==='campaigns'&&<>
-    <CampaignDashboard workspaceId={active.id} bookings={bookings} posts={posts} onOpenPost={openPostFromDashboard} onCreateReport={createAdvertiserReport} onDeleteTelegram={requestDeleteFromTelegram} />
+    <CampaignDashboard workspaceId={active.id} bookings={bookings} posts={posts} onOpenPost={openPostFromDashboard} onCreateReport={createAdvertiserReport} onPayBooking={payBooking} onDeleteTelegram={requestDeleteFromTelegram} />
 
     <section className="panel" style={{marginTop:14}}>
      <div className="panel-title"><h2>Рекламодатели</h2><Users size={20}/></div>
