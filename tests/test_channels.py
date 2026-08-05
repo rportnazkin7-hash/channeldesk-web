@@ -35,6 +35,41 @@ def test_pending_connections(monkeypatch):
     assert r.status_code == 200
     assert len(r.json()) == 1
     assert r.json()[0]['title'] == 'Тестовый канал'
+    sql = ' '.join(call[0] for cur in conn.cursors for call in cur.calls)
+    assert "status='pending'" in sql
+
+
+def test_connect_reclaims_channel_from_deleted_workspace(monkeypatch):
+    old_channel = {'id': 99, 'workspace_id': 2, 'is_active': True, 'workspace_active': False}
+    reconnected = dict(CHANNEL_ROW, id=12, workspace_id=3)
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ROW, PENDING_ROW, old_channel, reconnected])
+    monkeypatch.setattr('api.channels.connect', lambda: conn)
+    monkeypatch.setattr('api.channels.verify_bot_permissions', lambda chat_id: {
+        'is_admin': True, 'can_post_messages': True,
+        'permissions': {'can_post_messages': True, 'can_edit_messages': True,
+                        'can_delete_messages': True, 'can_manage_chat': False}})
+
+    r = client.post('/api/workspaces/3/channels/connect', json={'connection_id': 4}, headers=auth_headers())
+
+    assert r.status_code == 201
+    assert r.json()['workspace_id'] == 3
+    sql = ' '.join(call[0] for cur in conn.cursors for call in cur.calls)
+    assert 'DELETE FROM cd_channels' in sql
+
+
+def test_delete_channel_returns_it_to_pending(monkeypatch):
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ROW, CHANNEL_ROW])
+    monkeypatch.setattr('api.channels.connect', lambda: conn)
+
+    r = client.delete('/api/workspaces/3/channels/11', headers=auth_headers())
+
+    assert r.status_code == 204
+    sql = ' '.join(call[0] for cur in conn.cursors for call in cur.calls)
+    assert 'UPDATE cd_channel_connections' in sql
+    assert 'is_active=false' in sql
+    assert 'channel.deleted' in ' '.join(str(params) for _, params in (
+        call for cur in conn.cursors for call in cur.calls
+    ) if params)
 
 
 def test_connect_success_with_live_admin(monkeypatch):

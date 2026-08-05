@@ -58,6 +58,7 @@ export const api={
   pending:()=>req<Pending[]>('/api/channel-connections/pending'),
  channels:(wid:number)=>req<Channel[]>(`/api/workspaces/${wid}/channels`),
  connect:(wid:number,id:number)=>req<Channel>(`/api/workspaces/${wid}/channels/connect`,{method:'POST',body:JSON.stringify({connection_id:id})}),
+ deleteChannel:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/channels/${id}`,{method:'DELETE'}),
  members:(wid:number)=>req<Member[]>(`/api/workspaces/${wid}/members`),
  createInvite:(wid:number,role='viewer')=>req<Invite>(`/api/workspaces/${wid}/invites`,{method:'POST',body:JSON.stringify({role})}),
  acceptInvite:(token:string)=>req<{workspace_id:number;workspace_name:string;role:string}>(`/api/invites/accept`,{method:'POST',body:JSON.stringify({token})}),

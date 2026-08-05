@@ -145,6 +145,18 @@ def delete_workspace(workspace_id: int, user: dict = Depends(current_user)):
         if not cur.fetchone():
             raise HTTPException(403, 'Удалить рабочее пространство может только его владелец')
         audit(cur, workspace_id, user['id'], 'workspace.deleted', 'workspace', workspace_id)
+        # Рабочее пространство скрывается, поэтому его каналы нужно сразу
+        # вернуть в список ожидающих подключений. Иначе старый connected
+        # остаётся привязанным к архивному workspace и блокирует повторное
+        # подключение того же Telegram-канала.
+        cur.execute("""UPDATE cd_channel_connections
+        SET status='pending',connected_channel_id=NULL,updated_at=now()
+        WHERE connected_channel_id IN (
+          SELECT id FROM cd_channels WHERE workspace_id=%s
+        )""", (workspace_id,))
+        cur.execute("""UPDATE cd_channels
+        SET is_connected=false,is_active=false,updated_at=now()
+        WHERE workspace_id=%s""", (workspace_id,))
         cur.execute('UPDATE cd_workspaces SET is_active=false,updated_at=now() WHERE id=%s', (workspace_id,))
         return None
 
