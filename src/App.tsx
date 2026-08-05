@@ -413,6 +413,7 @@ export default function App(){
     <div className="campaign-card">
      <div className="campaign-card-title"><strong>Partner API</strong><Code2 size={18}/></div>
      <p className="campaign-hint">Подключайте сайт, форму или CRM. По умолчанию внешний сервис может только создавать черновики и читать их статус.</p>
+     <p className="campaign-hint">ID рабочего пространства: <code>{active.id}</code></p>
      <label className="form-label">Название API-ключа</label>
      <div className="btn-row"><input className="field" value={apiKeyName} onChange={e=>setApiKeyName(e.target.value)} placeholder="Например, сайт редакции"/><button className="primary-btn" onClick={()=>void createApiKey()} disabled={integrationsBusy||!apiKeyName.trim()}>{integrationsBusy?'Создаю…':'Создать ключ'}</button></div>
      <label className="campaign-checkbox" style={{marginTop:10}}><input type="checkbox" checked={apiKeyCanRequestPublish} onChange={e=>setApiKeyCanRequestPublish(e.target.checked)}/><span>Разрешить только запрашивать публикацию после проверки</span></label>
