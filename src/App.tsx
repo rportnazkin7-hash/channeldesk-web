@@ -4,8 +4,9 @@ import { api,type Workspace,type Pending,type Channel,type Member,type Invite,ty
 import Statistics from './Statistics'
 import Analytics from './Analytics'
 import AdCampaignFlow from './AdCampaignFlow'
+import CampaignDashboard from './CampaignDashboard'
 
-const APP_VERSION = 'v0.37.0'
+const APP_VERSION = 'v0.38.0'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 type DeleteJob = Awaited<ReturnType<typeof api.deletePostFromTelegramStatus>>
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
@@ -105,6 +106,7 @@ export default function App(){
  async function makeInvite(){buzz();if(!active)return;setError('');try{const iv=await api.createInvite(active.id,'editor');setInvite(iv);setCopied(false)}catch(e){setError(e instanceof Error?e.message:'Ошибка создания приглашения')}}
  async function copyInvite(){buzz();if(!invite)return;try{await navigator.clipboard.writeText(invite.token);setCopied(true)}catch{setCopied(false)}}
  function goSection(id:string){buzz();closeSubviews();setTab('overview');setTimeout(()=>{document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'})},80)}
+ function openPostFromDashboard(id:number){buzz();closeSubviews();setTab('calendar');setTimeout(()=>{void openDetails(id)},80)}
  async function createDraft(){buzz();if(!active)return;setBusy(true);setError('');try{const post=await api.createPost(active.id,{title:newTitle,text:newText,channel_id:draftChannel,buttons:draftBtns.length?[draftBtns]:[]});for(const f of draftFiles){const ticket=await api.uploadTicket(active.id,{post_id:post.id,file_name:f.name,content_type:f.type||'application/octet-stream',size:f.size});await api.uploadDirect(ticket,f)}setNewTitle('');setNewText('');setDraftChannel(null);setDraftBtns([]);setDraftFiles([]);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания черновика')}finally{setBusy(false)}}
  function addDraftBtn(){buzz();const t=draftBtnText.trim(),u=draftBtnUrl.trim();if(!t||!u)return;if(!validButtonUrl(u)){setError('URL кнопки должен начинаться с https://, http:// или tg://');return}setDraftBtns([...draftBtns,{text:t,url:u}]);setDraftBtnText('');setDraftBtnUrl('')}
  function pickFiles(list:FileList|null){if(!list)return;setDraftFiles([...draftFiles,...Array.from(list)].slice(0,10))}
@@ -292,6 +294,8 @@ export default function App(){
     <section className="panel"><div className="panel-title"><h2>Клиенты</h2><Users size={20}/></div>
      <p style={{color:'var(--muted)',fontSize:12,margin:'4px 0 0'}}>Рекламодатели и размещения. Создание — через «+» внизу.</p>
     </section>
+
+    <CampaignDashboard workspaceId={active.id} bookings={bookings} posts={posts} onOpenPost={openPostFromDashboard} onCreateReport={createAdvertiserReport} onDeleteTelegram={requestDeleteFromTelegram} />
 
     <section className="panel" style={{marginTop:14}}>
      <div className="panel-title"><h2>Рекламодатели</h2><Users size={20}/></div>

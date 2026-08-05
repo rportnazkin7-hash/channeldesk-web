@@ -108,6 +108,33 @@ select.field option{background:var(--panel);color:var(--text)}
 .post-editor{padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--border)}
 .post-editor .primary-btn{margin-top:10px}
 
+/* ---------- Дашборд кампании ---------- */
+.campaign-dashboard{margin-top:14px}
+.campaign-dashboard-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.campaign-dashboard-head h2{margin:4px 0 0;font-size:17px;letter-spacing:-.3px}
+.campaign-dashboard-head>svg{color:var(--accent-2)}
+.campaign-dashboard-select{margin-top:12px}
+.campaign-dashboard-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:13px}
+.campaign-dashboard-title>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.campaign-dashboard-title strong{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.campaign-dashboard-title span:not(.status){color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.campaign-dashboard-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:12px}
+.campaign-dashboard-metrics>div{min-width:0;padding:10px;border:1px solid var(--border);border-radius:9px;background:var(--panel-2)}
+.campaign-dashboard-metrics span{display:block;color:var(--muted-2);font-size:9px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.campaign-dashboard-metrics b{display:block;margin-top:5px;color:var(--text);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.campaign-green{color:var(--accent-2)!important}.campaign-yellow{color:var(--warn)!important}.campaign-blue{color:#7dd3fc!important}
+.campaign-dashboard-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:12px}
+.campaign-dashboard-steps span{padding:7px 2px;border-bottom:2px solid var(--border-2);color:var(--muted-2);font-size:9px;text-align:center;white-space:nowrap}
+.campaign-dashboard-steps span.done{border-color:var(--accent);color:var(--accent-2)}
+.campaign-dashboard-card{margin-top:10px;padding:11px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2)}
+.campaign-dashboard-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.campaign-dashboard-card-head strong{font-size:12px}.campaign-dashboard-card-head span{color:var(--muted-2);font-size:10px}
+.campaign-dashboard-card h3{margin:9px 0 0;font-size:14px}.campaign-dashboard-card p{margin:6px 0 0;color:var(--text-2);font-size:11px;line-height:1.45;white-space:pre-wrap;max-height:75px;overflow:auto}
+.campaign-dashboard-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.campaign-dashboard-chips span{padding:4px 7px;border:1px solid var(--border-2);border-radius:7px;background:var(--chip-bg);color:var(--text-2);font-size:10px}
+.campaign-dashboard-empty{margin-top:8px;color:var(--muted-2);font-size:11px}.campaign-dashboard-link{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 0;border-top:1px solid var(--border)}.campaign-dashboard-link>div{min-width:0;display:flex;flex-direction:column;gap:3px}.campaign-dashboard-link strong{font-size:11px}.campaign-dashboard-link span{color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.campaign-dashboard-link b{color:var(--accent-2);font-size:11px;white-space:nowrap}
+.campaign-dashboard-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:12px}.campaign-dashboard-actions button{min-width:0;width:100%}.campaign-dashboard-actions button:last-child:nth-child(odd){grid-column:1/-1}
+@media(max-width:430px){.campaign-dashboard-metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.campaign-dashboard-metrics>div{padding:8px}.campaign-dashboard-metrics b{font-size:11px}.campaign-dashboard-steps span{font-size:8px}.campaign-dashboard-actions{grid-template-columns:1fr}}
+
 /* ---------- Поток рекламной кампании ---------- */
 .campaign-flow{margin-top:4px}
 .campaign-flow-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
