@@ -35,6 +35,33 @@ def get_bot_id() -> int | None:
     return _bot_id
 
 
+def get_chat_member(chat_id: int | str, user_id: int) -> dict | None:
+    """Возвращает участника чата через Bot API или None, если проверка недоступна."""
+    data = _get_json('getChatMember', {'chat_id': chat_id, 'user_id': user_id})
+    if not data or not data.get('ok'):
+        return None
+    result = data.get('result') or {}
+    return result if isinstance(result, dict) else None
+
+
+def is_subscribed_member(member: dict | None) -> bool:
+    """Статусы Bot API, которые означают действующую подписку на канал."""
+    if not member:
+        return False
+    status = member.get('status')
+    if status in {'member', 'administrator', 'creator'}:
+        return True
+    return status == 'restricted' and bool(member.get('is_member'))
+
+
+def required_channel_subscription(user_id: int, chat_id: int | str = '@thechanneldesk') -> bool | None:
+    """Проверяет подписку пользователя: None означает ошибку/недоступность Bot API."""
+    member = get_chat_member(chat_id, user_id)
+    if member is None:
+        return None
+    return is_subscribed_member(member)
+
+
 def verify_bot_permissions(chat_id: int) -> dict | None:
     """Live-проверка прав бота в канале через getChatMember.
 

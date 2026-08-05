@@ -33,6 +33,9 @@ function fmtDate(s:string){try{return new Date(s).toLocaleString('ru-RU',{day:'2
 function validButtonUrl(url:string){return /^(https?:\/\/|tg:\/\/)/i.test(url.trim())}
 
 function errorHint(msg:string):string{
+ if(msg.includes('Бот в разработке')) return 'Следите за обновлениями: https://t.me/thechanneldesk'
+ if(msg.includes('подпишитесь на канал')) return 'Откройте ссылку на канал, подпишитесь и затем снова откройте Mini App из бота.'
+ if(msg.includes('Не удалось проверить подписку')) return 'Проверьте интернет и повторите попытку. Бот должен быть администратором канала @thechanneldesk.'
  if(msg.includes('401')) return 'Telegram-авторизация не получена. Откройте приложение через Telegram (кнопка WebApp у @channel_desk_bot), а не через браузер.'
  if(msg.includes('503')) return 'Сервер временно не подключился к базе. Обновление повторится автоматически; если ошибка не исчезнет, проверьте Supabase и Vercel.'
  if(msg.includes('500')) return 'Внутренняя ошибка сервера. Проверьте журналы Vercel и состояние миграций БД.'
@@ -136,6 +139,7 @@ export default function App(){
  const canReview=active?.role==='owner'||active?.role==='admin'||active?.role==='editor'
  const canSchedule=canReview||active?.role==='ad_manager'
  const hint=error?errorHint(error):''
+ const accessLocked=error.includes('Бот в разработке')||error.includes('подпишитесь на канал')||error.includes('Не удалось проверить подписку')
  const todayKey=dayKey(new Date())
  const calCells=monthGrid(calYear,calMonth)
  const calendarPosts=posts.filter(p=>{const query=calendarQuery.trim().toLowerCase();const matchesChannel=calendarChannel==null||p.channel_id===calendarChannel;const matchesStatus=calendarStatus==='all'||p.status===calendarStatus;const matchesQuery=!query||`${p.title||''} ${p.text||''} ${p.channel_title||''}`.toLowerCase().includes(query);return matchesChannel&&matchesStatus&&matchesQuery})
@@ -232,6 +236,8 @@ export default function App(){
    </div>}
   </article>
  }
+
+ if(accessLocked) return <div className="app"><header><div><span className="eyebrow">CHANNELDESK</span><h1>ChannelDesk</h1></div><button className="workspace" onClick={()=>{buzz();void load()}} title="Проверить доступ"><RefreshCw size={15}/></button></header><main><section className="panel" style={{marginTop:20,textAlign:'center',padding:'28px 18px'}}><div style={{fontSize:42,marginBottom:12}}>{error.includes('Бот в разработке')?'🚧':'🔒'}</div><h2 style={{margin:'0 0 10px'}}>{error.includes('Бот в разработке')?'Бот в разработке':'Нужна подписка на канал'}</h2><p style={{color:'var(--muted)',fontSize:13,lineHeight:1.5,margin:'0 auto 18px',maxWidth:360}}>{error}</p><a className="primary-btn" href="https://t.me/thechanneldesk" target="_blank" rel="noreferrer" style={{display:'inline-flex',textDecoration:'none',justifyContent:'center'}}>Открыть канал</a><button className="icon-btn" onClick={()=>{buzz();void load()}} style={{display:'block',margin:'12px auto 0'}}>Проверить доступ</button>{hint&&<p className="hint" style={{marginTop:16}}>{hint}</p>}</section></main></div>
 
  return <div className="app"><header><div><span className="eyebrow">РАБОЧЕЕ ПРОСТРАНСТВО</span><h1>ChannelDesk</h1></div><button className="workspace" onClick={()=>{buzz();load()}} title="Обновить"><RefreshCw size={15}/></button></header><main>
   {!hasInitData&&<section className="panel warn"><strong>⚠ Приложение работает только внутри Telegram</strong><p>Откройте его через бота <code>@channel_desk_bot</code> (кнопка «Открыть ChannelDesk») — так Telegram передаст авторизацию.</p></section>}

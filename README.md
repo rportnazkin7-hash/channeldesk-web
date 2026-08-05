@@ -16,6 +16,9 @@ Frontend (React/Vite Mini App) + FastAPI backend. Деплоится на **Verc
 BOT_TOKEN=<токен @channel_desk_bot>
 DATABASE_URL=<Supabase pooler URL>
 ADMIN_IDS=<Telegram ID владельца>
+REQUIRED_CHANNEL=@thechanneldesk
+REQUIRED_CHANNEL_URL=https://t.me/thechanneldesk
+ZBT_ENABLED=true
 ALLOWED_ORIGINS=https://channeldesk.vercel.app
 ```
 

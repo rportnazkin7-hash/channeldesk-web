@@ -3,6 +3,7 @@ import hashlib,hmac,json,os
 from time import time
 from urllib.parse import parse_qsl
 from fastapi import Header,HTTPException
+from api.access import require_access
 from api.db import connect
 
 MAX_INIT_DATA_AGE=86400
@@ -27,9 +28,12 @@ def validate_init_data(raw: str) -> dict:
 
 def current_user(x_telegram_init_data: str|None=Header(default=None),x_dev_api_key: str|None=Header(default=None)) -> dict:
     expected=os.getenv('DEV_API_KEY','').strip()
-    if expected and x_dev_api_key and hmac.compare_digest(expected,x_dev_api_key):
+    dev_access=bool(expected and x_dev_api_key and hmac.compare_digest(expected,x_dev_api_key))
+    if dev_access:
         tg={'id':123456789,'username':'developer','first_name':'Developer','last_name':None}
-    else: tg=validate_init_data(x_telegram_init_data or '')
+    else:
+        tg=validate_init_data(x_telegram_init_data or '')
+        require_access(int(tg['id']))
     with connect() as conn, conn.cursor() as cur:
         cur.execute('''INSERT INTO cd_users(telegram_id,username,first_name,last_name,last_seen_at)
         VALUES(%s,%s,%s,%s,now()) ON CONFLICT(telegram_id) DO UPDATE SET username=excluded.username,
