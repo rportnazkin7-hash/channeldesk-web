@@ -5,9 +5,11 @@ import Statistics from './Statistics'
 import Analytics from './Analytics'
 import AdCampaignFlow from './AdCampaignFlow'
 import CampaignDashboard from './CampaignDashboard'
+import AdCalendar from './AdCalendar'
 
-const APP_VERSION = 'v0.39.0'
-type Tab = 'overview'|'calendar'|'ads'|'more'
+const APP_VERSION = 'v0.40.0'
+type Tab = 'overview'|'posts'|'ads'|'more'
+type ClientView = 'campaigns'|'calendar'
 type DeleteJob = Awaited<ReturnType<typeof api.deletePostFromTelegramStatus>>
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
 const STATUS_LABEL:Record<string,string>={idea:'Идея',draft:'Черновик',in_progress:'В работе',review:'На согласовании',changes_requested:'Требует правок',approved:'Одобрено',scheduled:'Запланировано',publishing:'Публикуется…',published:'Опубликовано',failed:'Ошибка',cancelled:'Отменено'}
@@ -40,11 +42,13 @@ function errorHint(msg:string):string{
 
 export default function App(){
  const [tab,setTab]=useState<Tab>('overview')
+ const [clientView,setClientView]=useState<ClientView>('campaigns')
  const [spaces,setSpaces]=useState<Workspace[]>([]),[activeId,setActiveId]=useState<number|null>(null),[pending,setPending]=useState<Pending[]>([]),[channels,setChannels]=useState<Channel[]>([]),[members,setMembers]=useState<Member[]>([]),[invite,setInvite]=useState<Invite|null>(null),[copied,setCopied]=useState(false),[joined,setJoined]=useState<{workspace_name:string;role:string}|null>(null),[exportMsg,setExportMsg]=useState(''),[exportJobs,setExportJobs]=useState<Awaited<ReturnType<typeof api.exportsStatus>>>([]),[deleteNotice,setDeleteNotice]=useState(''),[deletePostId,setDeletePostId]=useState<number|null>(null),[deleteJob,setDeleteJob]=useState<DeleteJob|null>(null),[name,setName]=useState('Моё агентство'),[error,setError]=useState(''),[loading,setLoading]=useState(true)
  const [posts,setPosts]=useState<Post[]>([]),[newTitle,setNewTitle]=useState(''),[newText,setNewText]=useState(''),[draftChannel,setDraftChannel]=useState<number|null>(null),[busy,setBusy]=useState(false)
  const [draftBtns,setDraftBtns]=useState<Button[]>([]),[draftBtnText,setDraftBtnText]=useState(''),[draftBtnUrl,setDraftBtnUrl]=useState(''),[draftFiles,setDraftFiles]=useState<File[]>([])
  const [calYear,setCalYear]=useState(new Date().getFullYear()),[calMonth,setCalMonth]=useState(new Date().getMonth()),[selectedDay,setSelectedDay]=useState<Date|null>(null)
  const [calendarChannel,setCalendarChannel]=useState<number|null>(null),[calendarQuery,setCalendarQuery]=useState(''),[calendarStatus,setCalendarStatus]=useState<'all'|'scheduled'|'review'|'published'>('all')
+ const [postsChannel,setPostsChannel]=useState<number|null>(null),[postsQuery,setPostsQuery]=useState(''),[postsStatus,setPostsStatus]=useState<'all'|'draft'|'review'|'scheduled'|'published'>('all')
  const [openPost,setOpenPost]=useState<number|null>(null),[comments,setComments]=useState<Record<number,Comment[]>>({}),[versions,setVersions]=useState<Record<number,Version[]>>({}),[commentText,setCommentText]=useState('')
  const [editTitle,setEditTitle]=useState(''),[editText,setEditText]=useState('')
  const [assetsByPost,setAssetsByPost]=useState<Record<number,Asset[]>>({})
@@ -106,7 +110,7 @@ export default function App(){
  async function makeInvite(){buzz();if(!active)return;setError('');try{const iv=await api.createInvite(active.id,'editor');setInvite(iv);setCopied(false)}catch(e){setError(e instanceof Error?e.message:'Ошибка создания приглашения')}}
  async function copyInvite(){buzz();if(!invite)return;try{await navigator.clipboard.writeText(invite.token);setCopied(true)}catch{setCopied(false)}}
  function goSection(id:string){buzz();closeSubviews();setTab('overview');setTimeout(()=>{document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'})},80)}
- function openPostFromDashboard(id:number){buzz();closeSubviews();setTab('calendar');setTimeout(()=>{void openDetails(id)},80)}
+ function openPostFromDashboard(id:number){buzz();closeSubviews();setTab('posts');setTimeout(()=>{void openDetails(id)},80)}
  async function createDraft(){buzz();if(!active)return;setBusy(true);setError('');try{const post=await api.createPost(active.id,{title:newTitle,text:newText,channel_id:draftChannel,buttons:draftBtns.length?[draftBtns]:[]});for(const f of draftFiles){const ticket=await api.uploadTicket(active.id,{post_id:post.id,file_name:f.name,content_type:f.type||'application/octet-stream',size:f.size});await api.uploadDirect(ticket,f)}setNewTitle('');setNewText('');setDraftChannel(null);setDraftBtns([]);setDraftFiles([]);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания черновика')}finally{setBusy(false)}}
  function addDraftBtn(){buzz();const t=draftBtnText.trim(),u=draftBtnUrl.trim();if(!t||!u)return;if(!validButtonUrl(u)){setError('URL кнопки должен начинаться с https://, http:// или tg://');return}setDraftBtns([...draftBtns,{text:t,url:u}]);setDraftBtnText('');setDraftBtnUrl('')}
  function pickFiles(list:FileList|null){if(!list)return;setDraftFiles([...draftFiles,...Array.from(list)].slice(0,10))}
@@ -133,6 +137,7 @@ export default function App(){
  const calCells=monthGrid(calYear,calMonth)
  const calendarPosts=posts.filter(p=>{const query=calendarQuery.trim().toLowerCase();const matchesChannel=calendarChannel==null||p.channel_id===calendarChannel;const matchesStatus=calendarStatus==='all'||p.status===calendarStatus;const matchesQuery=!query||`${p.title||''} ${p.text||''} ${p.channel_title||''}`.toLowerCase().includes(query);return matchesChannel&&matchesStatus&&matchesQuery})
  const dayPosts=selectedDay?calendarPosts.filter(p=>postDayKey(p)===dayKey(selectedDay)):calendarPosts
+ const postsView=posts.filter(p=>{const q=postsQuery.trim().toLowerCase();return (postsChannel==null||p.channel_id===postsChannel)&&(postsStatus==='all'||p.status===postsStatus)&&(!q||`${p.title||''} ${p.text||''} ${p.channel_title||''}`.toLowerCase().includes(q))})
  function calendarDayClass(day:Date){const dayItems=calendarPosts.filter(p=>postDayKey(p)===dayKey(day));if(!dayItems.length)return '';if(dayItems.some(p=>p.status==='review'))return 'has has-review';if(dayItems.some(p=>p.status==='published'))return 'has has-published';return 'has has-scheduled'}
 
  const futureBookings=bookings.filter(b=>['requested','confirmed'].includes(b.status))
@@ -259,35 +264,13 @@ export default function App(){
    </>}
   </>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='calendar'&&<>
-   {!active?<section className="panel"><div className="empty"><div className="empty-icon"><CalendarDays/></div><h3>Создайте рабочее пространство</h3><p>Календарь публикаций появится после создания пространства и подключения канала.</p></div></section>:<>
-    <section className="panel">
-     <div className="cal-head">
-      <button className="icon-btn" onClick={()=>{buzz();setCalMonth(m=>m===0?(setCalYear(y=>y-1),11):m-1)}}><ChevronLeft size={17}/></button>
-      <strong>{MONTHS[calMonth]} {calYear}</strong>
-      <button className="icon-btn" onClick={()=>{buzz();setCalMonth(m=>m===11?(setCalYear(y=>y+1),0):m+1)}}><ChevronRight size={17}/></button>
-     </div>
-     <div className="calendar-toolbar">
-      <input className="field" placeholder="Поиск по публикациям…" value={calendarQuery} onChange={e=>setCalendarQuery(e.target.value)} />
-      <select className="field" value={calendarChannel??''} onChange={e=>setCalendarChannel(e.target.value?Number(e.target.value):null)}><option value="">Все каналы</option>{channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}</select>
-     </div>
-     <div className="calendar-status-filter">{(['all','scheduled','review','published'] as const).map(status=><button key={status} className={calendarStatus===status?'active':''} onClick={()=>{buzz();setCalendarStatus(status)}}>{status==='all'?'Все':status==='scheduled'?'Запланированы':status==='review'?'Согласование':'Опубликованы'}</button>)}</div>
-     <div className="cal-grid">{['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(d=><div key={d} className="cal-dow">{d}</div>)}
-      {calCells.map((d,i)=>d?(()=>{const k=dayKey(d);const dayClass=calendarDayClass(d);const has=!!dayClass;const sel=selectedDay&&dayKey(selectedDay)===k;return <button key={i} className={"cal-day "+dayClass+(sel?' sel':'')+(k===todayKey?' today':'')} onClick={()=>{buzz();setSelectedDay(sel?null:d)}}><span>{d.getDate()}</span>{has&&<i/>}</button>})():<div key={i} className="cal-day empty"/>)}
-     </div>
-     <div className="cal-hint">{selectedDay?`Посты за ${selectedDay.getDate()} ${MONTHS[selectedDay.getMonth()]}`:'Выберите день, чтобы фильтровать посты'}</div>
-    </section>
-
-    <section className="panel" style={{marginTop:14}}><div className="panel-title"><h2>Публикации <span className="calendar-count">{dayPosts.length}</span></h2><Clock size={20}/></div>
-     <div className="btn-row" style={{marginBottom:12}}>
-      <button className="icon-btn" onClick={()=>sendExport('posts','csv')}><Download size={14}/> CSV</button>
-      <button className="icon-btn" onClick={()=>sendExport('posts','xlsx')}><Download size={14}/> XLSX</button>
-      <button className="icon-btn" onClick={()=>sendExport('posts','pdf')}><Download size={14}/> PDF</button>
-     </div>
-     {dayPosts.length===0?<div className="empty"><p>Нет публикаций.</p></div>:dayPosts.map(renderPostCard)}
-    </section>
-   </>}
-  </>}
+  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='posts'&&<section className="panel posts-view">
+   <div className="posts-view-head"><div><span className="eyebrow">КОНТЕНТ</span><h2>Посты</h2></div><FileText size={20}/></div>
+   <div className="posts-filters"><input className="field" placeholder="Поиск по постам…" value={postsQuery} onChange={e=>setPostsQuery(e.target.value)}/><select className="field" value={postsChannel??''} onChange={e=>setPostsChannel(e.target.value?Number(e.target.value):null)}><option value="">Все каналы</option>{channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}</select></div>
+   <div className="posts-status-filter">{(['all','draft','review','scheduled','published'] as const).map(status=><button key={status} className={postsStatus===status?'active':''} onClick={()=>{buzz();setPostsStatus(status)}}>{status==='all'?'Все':status==='draft'?'Черновики':status==='review'?'Согласование':status==='scheduled'?'Запланированы':'Опубликованы'}</button>)}</div>
+   <div className="posts-export"><span>{postsView.length} публикаций</span><div className="btn-row"><button className="icon-btn" onClick={()=>sendExport('posts','csv')}><Download size={14}/> CSV</button><button className="icon-btn" onClick={()=>sendExport('posts','xlsx')}><Download size={14}/> XLSX</button><button className="icon-btn" onClick={()=>sendExport('posts','pdf')}><Download size={14}/> PDF</button></div></div>
+   {postsView.length?postsView.map(renderPostCard):<div className="empty"><p>Постов по выбранным фильтрам нет.</p><button className="primary-btn" onClick={()=>{buzz();setFabOpen(true)}}>Создать пост</button></div>}
+  </section>}
 
   {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&tab==='ads'&&<>
    {!active?<section className="panel"><div className="empty"><div className="empty-icon"><Megaphone/></div><h3>Создайте рабочее пространство</h3><p>Раздел клиентов появится после создания пространства.</p></div></section>:<>
@@ -295,6 +278,8 @@ export default function App(){
      <p style={{color:'var(--muted)',fontSize:12,margin:'4px 0 0'}}>Рекламодатели и размещения. Создание — через «+» внизу.</p>
     </section>
 
+    <div className="client-view-switch"><button className={clientView==='campaigns'?'active':''} onClick={()=>{buzz();setClientView('campaigns')}}>Кампании</button><button className={clientView==='calendar'?'active':''} onClick={()=>{buzz();setClientView('calendar')}}>Рекламный календарь</button></div>
+    {clientView==='campaigns'&&<>
     <CampaignDashboard workspaceId={active.id} bookings={bookings} posts={posts} onOpenPost={openPostFromDashboard} onCreateReport={createAdvertiserReport} onDeleteTelegram={requestDeleteFromTelegram} />
 
     <section className="panel" style={{marginTop:14}}>
@@ -349,9 +334,11 @@ export default function App(){
      </>}
     </section>
    </>}
+   {clientView==='calendar'&&<AdCalendar bookings={bookings} channels={channels}/>}
+  </>}
   </>}
 
-  {showCampaignFlow&&active&&<AdCampaignFlow workspaceId={active.id} channels={channels} advertisers={advertisers} onBack={()=>{buzz();setShowCampaignFlow(false)}} onDone={()=>{setShowCampaignFlow(false);setTab('calendar');void load()}} onError={setError}/>}
+  {showCampaignFlow&&active&&<AdCampaignFlow workspaceId={active.id} channels={channels} advertisers={advertisers} onBack={()=>{buzz();setShowCampaignFlow(false)}} onDone={()=>{setShowCampaignFlow(false);setClientView('campaigns');setTab('ads');void load()}} onError={setError}/>}
 
   {showCompose&&<section id="draft-form" className="panel">
    <div className="panel-title"><h2>Новый пост</h2><FileText size={20}/></div>
@@ -529,6 +516,7 @@ export default function App(){
     {icon:Megaphone,label:'Каналы',desc:'Управление подключёнными каналами',action:()=>goSection('channels-section')},
     {icon:Users,label:'Команда',desc:'Участники и приглашения',action:()=>goSection('team-section')},
     {icon:CheckCircle2,label:'Задачи',desc:'Задачи и напоминания',action:()=>{buzz();setShowTasks(true)}},
+    {icon:CalendarDays,label:'Рекламный календарь',desc:'Занятые рекламные даты',action:()=>{buzz();setClientView('calendar');setTab('ads')}},
     {icon:LineChart,label:'Статистика',desc:'Доходы, расходы, прибыль и отчёты',action:()=>{buzz();if(active)setShowStatistics(true);else setError('Сначала создайте рабочее пространство')}},
     {icon:Activity,label:'Аналитика каналов',desc:'Охват, просмотры, ссылки и метрики',action:()=>{buzz();if(active)setShowAnalytics(true);else setError('Сначала создайте рабочее пространство')}},
     {icon:ImageIcon,label:'Медиакиты',desc:'Презентация для рекламодателей',action:()=>{buzz();setShowMediaKits(true)}},
@@ -547,7 +535,7 @@ export default function App(){
   <div className="ver">ChannelDesk {APP_VERSION}</div>
  </main><nav>
   <button className={tab==='overview'?'active':''} onClick={()=>navigate('overview')}><BarChart3 size={21}/><span>Обзор</span></button>
-  <button className={tab==='calendar'?'active':''} onClick={()=>navigate('calendar')}><CalendarDays size={21}/><span>Календарь</span></button>
+  <button className={tab==='posts'?'active':''} onClick={()=>navigate('posts')}><FileText size={21}/><span>Посты</span></button>
   <button className="fab" onClick={()=>{buzz();setFabOpen(!fabOpen)}} title="Создать"><CirclePlus size={26}/><span>Создать</span></button>
   <button className={tab==='ads'?'active':''} onClick={()=>navigate('ads')}><Megaphone size={21}/><span>Клиенты</span></button>
   <button className={tab==='more'?'active':''} onClick={()=>navigate('more')}><MoreHorizontal size={21}/><span>Ещё</span></button>

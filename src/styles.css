@@ -167,6 +167,33 @@ select.field option{background:var(--panel);color:var(--text)}
 .campaign-check b{color:var(--accent-2);font-size:14px}
 @media(max-width:430px){.campaign-form-row{grid-template-columns:1fr}.campaign-flow-actions{align-items:stretch;flex-direction:column}.campaign-flow-actions .campaign-submit{width:100%}}
 
+/* ---------- Посты и рекламный календарь ---------- */
+.posts-view-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.posts-view-head h2{margin:4px 0 0;font-size:18px}
+.posts-filters{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:8px;margin-top:13px}
+.posts-status-filter{display:flex;gap:4px;overflow-x:auto;margin-top:8px;padding-bottom:2px}
+.posts-status-filter button{flex:0 0 auto;border:1px solid var(--border);background:var(--panel-2);color:var(--muted);border-radius:8px;padding:7px 9px;font-size:10px;white-space:nowrap}
+.posts-status-filter button.active{border-color:var(--accent-border);background:var(--accent-soft);color:var(--accent-2)}
+.posts-export{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;padding-bottom:10px;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px}
+.posts-export .btn-row{margin:0}
+.client-view-switch{display:flex;gap:4px;margin-top:12px;padding:3px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2)}
+.client-view-switch button{flex:1;border:0;border-radius:8px;background:none;color:var(--muted);padding:8px 6px;font-size:11px;font-weight:700}
+.client-view-switch button.active{background:var(--accent-soft);color:var(--accent-2)}
+.ad-calendar{margin-top:14px}
+.ad-calendar-title{display:flex;align-items:center;gap:7px}.ad-calendar-title svg{color:var(--accent-2)}.ad-calendar-title h2{margin:0;font-size:15px}
+.ad-calendar-note{margin:7px 0 10px;color:var(--muted);font-size:11px;line-height:1.4}
+.ad-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-top:10px}
+.ad-calendar-day{position:relative;min-height:38px;border:1px solid var(--border);border-radius:8px;background:var(--panel-2);color:var(--text-2);font-size:11px;font-weight:600}
+.ad-calendar-day.occupied{background:var(--accent-soft);border-color:var(--accent-border);color:var(--accent-2)}
+.ad-calendar-day.today{box-shadow:inset 0 0 0 2px var(--accent)}
+.ad-calendar-day.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.ad-calendar-day i{position:absolute;bottom:5px;left:50%;width:4px;height:4px;border-radius:50%;background:var(--accent-2);transform:translateX(-50%)}
+.ad-calendar-day.empty{border-color:transparent;background:none}
+.ad-calendar-legend{display:flex;gap:12px;margin-top:9px;color:var(--muted-2);font-size:10px}.ad-calendar-legend span{display:flex;align-items:center;gap:5px}.legend-dot{width:6px;height:6px;border-radius:50%}.occupied-dot{background:var(--accent-2)}.today-dot{background:var(--accent)}
+.ad-calendar-day-list{margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
+.ad-calendar-booking{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)}.ad-calendar-booking>div{display:flex;flex-direction:column;gap:3px;min-width:0}.ad-calendar-booking strong{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ad-calendar-booking span:not(.status){color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ad-calendar-empty{color:var(--muted-2);font-size:11px}
+@media(max-width:430px){.posts-filters{grid-template-columns:1fr}.posts-export{align-items:flex-start;flex-direction:column}.posts-export .btn-row{width:100%}.posts-export .btn-row .icon-btn{flex:1}.client-view-switch button{font-size:10px}.ad-calendar-day{min-height:34px}}
+
 /* ---------- Календарь ---------- */
 .cal-head{display:flex;align-items:center;justify-content:space-between;margin:2px 0 2px}
 .cal-head strong{font-size:14px;color:var(--text);letter-spacing:-.2px;font-variant-numeric:tabular-nums}
