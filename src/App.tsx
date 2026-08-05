@@ -5,7 +5,7 @@ import Statistics from './Statistics'
 import Analytics from './Analytics'
 import AdCampaignFlow from './AdCampaignFlow'
 
-const APP_VERSION = 'v0.36.0'
+const APP_VERSION = 'v0.37.0'
 type Tab = 'overview'|'calendar'|'ads'|'more'
 type DeleteJob = Awaited<ReturnType<typeof api.deletePostFromTelegramStatus>>
 const ROLE_LABEL:Record<string,string>={owner:'Владелец',admin:'Администратор',editor:'Редактор',author:'Автор',designer:'Дизайнер',ad_manager:'Рекламный менеджер',analyst:'Аналитик',viewer:'Наблюдатель'}
@@ -48,7 +48,7 @@ export default function App(){
  const [editTitle,setEditTitle]=useState(''),[editText,setEditText]=useState('')
  const [assetsByPost,setAssetsByPost]=useState<Record<number,Asset[]>>({})
  const [templates,setTemplates]=useState<Template[]>([]),[newTplName,setNewTplName]=useState(''),[btnText,setBtnText]=useState(''),[btnUrl,setBtnUrl]=useState('')
- const [advertisers,setAdvertisers]=useState<Advertiser[]>([]),[bookings,setBookings]=useState<Booking[]>([]),[finSummary,setFinSummary]=useState<FinanceSummary|null>(null)
+ const [advertisers,setAdvertisers]=useState<Advertiser[]>([]),[bookings,setBookings]=useState<Booking[]>([]),[feedbackItems,setFeedbackItems]=useState<Awaited<ReturnType<typeof api.publicReportFeedback>>>([]),[finSummary,setFinSummary]=useState<FinanceSummary|null>(null)
  const [advName,setAdvName]=useState(''),[advContact,setAdvContact]=useState('')
  const [reportUrl,setReportUrl]=useState(''),[reportExpires,setReportExpires]=useState(''),[reportBusy,setReportBusy]=useState(false)
  const [trackingAdvertiserId,setTrackingAdvertiserId]=useState<number|null>(null),[trackingBookingId,setTrackingBookingId]=useState<number|null>(null),[trackingChannelId,setTrackingChannelId]=useState<number|null>(null),[trackingName,setTrackingName]=useState(''),[trackingTarget,setTrackingTarget]=useState(''),[trackingUrl,setTrackingUrl]=useState(''),[trackingBusy,setTrackingBusy]=useState(false)
@@ -76,9 +76,9 @@ export default function App(){
  const hasInitData=!!(window.Telegram?.WebApp?.initData)
  const refreshInFlight=useRef(false)
 
- async function load(){setLoading(true);setError('');try{const s=await api.workspaces();setSpaces(s);const a=s.find(x=>x.id===activeId)||s[0]||null;setActiveId(a?a.id:null);const [p,c,m,po,t,ad,bk,fs,mk,ts]=await Promise.all([api.pending(),a?api.channels(a.id):Promise.resolve([]),a?api.members(a.id):Promise.resolve([]),a?api.posts(a.id):Promise.resolve([]),a?api.templates(a.id):Promise.resolve([]),a?api.advertisers(a.id):Promise.resolve([]),a?api.bookings(a.id):Promise.resolve([]),a?api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1):Promise.resolve(null),a?api.mediaKits(a.id):Promise.resolve([]),a?api.tasks(a.id):Promise.resolve([])]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFinSummary(fs);setMediaKits(mk);setTasks(ts);setOpenPost(null)}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки')}finally{setLoading(false)}}
+ async function load(){setLoading(true);setError('');try{const s=await api.workspaces();setSpaces(s);const a=s.find(x=>x.id===activeId)||s[0]||null;setActiveId(a?a.id:null);const [p,c,m,po,t,ad,bk,fb,fs,mk,ts]=await Promise.all([api.pending(),a?api.channels(a.id):Promise.resolve([]),a?api.members(a.id):Promise.resolve([]),a?api.posts(a.id):Promise.resolve([]),a?api.templates(a.id):Promise.resolve([]),a?api.advertisers(a.id):Promise.resolve([]),a?api.bookings(a.id):Promise.resolve([]),a?api.publicReportFeedback(a.id):Promise.resolve([]),a?api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1):Promise.resolve(null),a?api.mediaKits(a.id):Promise.resolve([]),a?api.tasks(a.id):Promise.resolve([])]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFeedbackItems(fb);setFinSummary(fs);setMediaKits(mk);setTasks(ts);setOpenPost(null)}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки')}finally{setLoading(false)}}
  // Тихий фоновый poll: обновляет данные без индикатора загрузки и без сброса открытых карточек.
- const refresh=useCallback(async ()=>{if(refreshInFlight.current)return;refreshInFlight.current=true;try{const s=await api.workspaces();const a=s.find(x=>x.id===activeId)||s[0]||null;if(!a)return;const [p,c,m,po,t,ad,bk,fs,mk,ts]=await Promise.all([api.pending(),api.channels(a.id),api.members(a.id),api.posts(a.id),api.templates(a.id),api.advertisers(a.id),api.bookings(a.id),api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1),api.mediaKits(a.id),api.tasks(a.id)]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFinSummary(fs);setMediaKits(mk);setTasks(ts);setSpaces(s)}catch{/* фоновая ошибка не должна тревожить пользователя */}finally{refreshInFlight.current=false}},[activeId])
+ const refresh=useCallback(async ()=>{if(refreshInFlight.current)return;refreshInFlight.current=true;try{const s=await api.workspaces();const a=s.find(x=>x.id===activeId)||s[0]||null;if(!a)return;const [p,c,m,po,t,ad,bk,fb,fs,mk,ts]=await Promise.all([api.pending(),api.channels(a.id),api.members(a.id),api.posts(a.id),api.templates(a.id),api.advertisers(a.id),api.bookings(a.id),api.publicReportFeedback(a.id),api.financeSummary(a.id,new Date().getFullYear(),new Date().getMonth()+1),api.mediaKits(a.id),api.tasks(a.id)]);setPending(p);setChannels(c);setMembers(m);setPosts(po);setTemplates(t);setAdvertisers(ad);setBookings(bk);setFeedbackItems(fb);setFinSummary(fs);setMediaKits(mk);setTasks(ts);setSpaces(s)}catch{/* фоновая ошибка не должна тревожить пользователя */}finally{refreshInFlight.current=false}},[activeId])
  useEffect(()=>{const timer=setInterval(()=>{refresh()},15000);return ()=>clearInterval(timer)},[refresh])
  useEffect(()=>{if(!showSettings||!active)return;api.workspaceSettings(active.id).then(settings=>setOverdueCancelDays(settings.overdue_cancel_days)).catch(e=>setError(e instanceof Error?e.message:'Ошибка загрузки настроек'))},[showSettings,active?.id])
  useEffect(()=>{if(!deletePostId||!deleteJob||deleteJob.status==='done'||deleteJob.status==='failed')return;const timer=setInterval(()=>{void checkDeleteStatus(deletePostId)},5000);return ()=>clearInterval(timer)},[deletePostId,deleteJob?.status,active?.id])
@@ -301,6 +301,15 @@ export default function App(){
       {canAdvertiserManage&&<><button className="icon-btn" style={{marginTop:9,width:'100%'}} onClick={()=>void createAdvertiserReport(a.id)} disabled={reportBusy}><Link2 size={14}/> {reportBusy?'Создаю ссылку…':'Создать публичный отчёт'}</button><button className="icon-btn danger" style={{marginTop:6,width:'100%'}} onClick={()=>void revokeAdvertiserReport(a.id)} disabled={reportBusy}>Отозвать все публичные ссылки</button></>}
      </div>)}
     </section>
+
+    {feedbackItems.length>0&&<section className="panel" style={{marginTop:14}}>
+     <div className="panel-title"><h2>Ответы рекламодателей</h2><MessageSquare size={20}/></div>
+     {feedbackItems.slice(0,10).map(item=><article key={item.id} style={{padding:'11px 0',borderBottom:'1px solid var(--border)'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><strong style={{fontSize:13}}>{item.advertiser_name}</strong><span className={"status "+(item.decision==='approved'?'status-published':'status-review')}>{item.decision==='approved'?'Одобрено':'Нужны правки'}</span></div>
+      <p style={{color:'var(--muted)',fontSize:11,margin:'5px 0 0'}}>{item.post_title||`Бронь #${item.booking_id}`} · {item.channel_title||'без канала'} · {fmtDate(item.created_at)}</p>
+      {item.comment&&<p style={{color:'var(--text-2)',fontSize:12,margin:'7px 0 0',lineHeight:1.4}}>«{item.comment}»</p>}
+     </article>)}
+    </section>}
 
     <section className="panel" style={{marginTop:14}}>
      <div className="panel-title"><h2>Ссылка кампании</h2><Link2 size={20}/></div>

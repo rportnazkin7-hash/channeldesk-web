@@ -76,6 +76,25 @@ def revoke_public_report(workspace_id: int, advertiser_id: int, user: dict = Dep
         return None
 
 
+@router.get('/workspaces/{workspace_id}/public-report-feedback')
+def list_public_feedback(workspace_id: int, limit: int = 50, user: dict = Depends(current_user)):
+    member = membership(user['id'], workspace_id)
+    require_action(member, 'advertiser.view')
+    limit = max(1, min(limit, 200))
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute("""SELECT f.id,f.booking_id,f.post_id,f.decision,f.comment,f.created_at,
+        a.name AS advertiser_name,b.format,b.publish_at,c.title AS channel_title,
+        p.title AS post_title
+        FROM cd_public_report_feedback f
+        JOIN cd_advertisers a ON a.id=f.advertiser_id
+        JOIN cd_ad_bookings b ON b.id=f.booking_id
+        LEFT JOIN cd_channels c ON c.id=b.channel_id
+        LEFT JOIN cd_posts p ON p.id=f.post_id
+        WHERE f.workspace_id=%s
+        ORDER BY f.created_at DESC LIMIT %s""", (workspace_id, limit))
+        return cur.fetchall() or []
+
+
 @router.get('/public/reports/{token}')
 def get_public_report(token: str):
     now = datetime.now(timezone.utc)

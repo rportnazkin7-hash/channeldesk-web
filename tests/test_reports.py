@@ -36,6 +36,17 @@ def test_create_public_report(monkeypatch):
     assert r.json()['advertiser_name'] == 'ООО Реклама'
 
 
+def test_list_public_report_feedback(monkeypatch):
+    item = {'id': 1, 'booking_id': 10, 'post_id': 20, 'decision': 'changes_requested', 'comment': 'Нужен другой заголовок',
+            'created_at': None, 'advertiser_name': 'ООО Реклама', 'format': 'post', 'publish_at': None,
+            'channel_title': 'Новости', 'post_title': 'Пост'}
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, [item]])
+    monkeypatch.setattr('api.reports.connect', lambda: conn)
+    r = client.get('/api/workspaces/3/public-report-feedback', headers=auth_headers())
+    assert r.status_code == 200
+    assert r.json()[0]['decision'] == 'changes_requested'
+
+
 def test_get_public_report(monkeypatch):
     conn = patch_db(monkeypatch, [REPORT_ROW | {'workspace_id': 3, 'advertiser_id': 4, 'advertiser_name': 'ООО Реклама'}, [BOOKING]])
     monkeypatch.setattr('api.reports.connect', lambda: conn)
