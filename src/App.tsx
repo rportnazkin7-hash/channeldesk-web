@@ -5,9 +5,10 @@ import Statistics from './Statistics'
 import Analytics from './Analytics'
 import AdCampaignFlow from './AdCampaignFlow'
 import CampaignDashboard from './CampaignDashboard'
+import RichTextEditor from './RichTextEditor'
 import AdCalendar from './AdCalendar'
 
-const APP_VERSION = 'v0.44.0'
+const APP_VERSION = 'v0.45.0'
 type Tab = 'overview'|'posts'|'ads'|'more'
 type ClientView = 'campaigns'|'calendar'
 type DeleteJob = Awaited<ReturnType<typeof api.deletePostFromTelegramStatus>>
@@ -198,7 +199,7 @@ export default function App(){
      <label className="form-label">Заголовок рекламного поста</label>
      <input className="field" value={editTitle} onChange={e=>setEditTitle(e.target.value)} placeholder="Заголовок" />
      <label className="form-label">Текст публикации</label>
-     <textarea className="field" rows={7} value={editText} onChange={e=>setEditText(e.target.value)} placeholder="Текст рекламного поста…" />
+     <RichTextEditor value={editText} onChange={setEditText} placeholder="Текст рекламного поста…" minHeight={170} />
      <button className="primary-btn" onClick={()=>void savePostContent(p.id)} disabled={busy}>Сохранить текст поста</button>
     </div>}
     {editable&&<div style={{marginBottom:12}}>
@@ -366,7 +367,7 @@ export default function App(){
     <label className="form-label">Заголовок</label>
     <input className="field" placeholder="О чём пост?" value={newTitle} onChange={e=>setNewTitle(e.target.value)}/>
     <label className="form-label">Текст (Telegram HTML: &lt;b&gt;, &lt;i&gt;, &lt;a href=…&gt;)</label>
-    <textarea className="field" rows={5} placeholder="Текст публикации…" value={newText} onChange={e=>setNewText(e.target.value)}/>
+    <RichTextEditor value={newText} onChange={setNewText} placeholder="Текст публикации…" minHeight={150} />
     <label className="form-label">Канал</label>
     <select className="field" value={draftChannel??''} onChange={e=>setDraftChannel(e.target.value?Number(e.target.value):null)}>
      <option value="">— без канала —</option>

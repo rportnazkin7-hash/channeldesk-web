@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, CheckCircle2, Link2, Paperclip, Plus, X } from 'lucide-react'
 import { api, type Advertiser, type Asset, type Booking, type Button, type Channel, type Post } from './api'
+import RichTextEditor from './RichTextEditor'
 
 type Props = {
   workspaceId: number
@@ -181,7 +182,7 @@ export default function AdCampaignFlow({ workspaceId, channels, advertisers, onB
     {step === 2 && <>
       <div className="campaign-card"><div className="campaign-card-title"><strong>Содержание</strong><span className="campaign-hint">Черновик</span></div>
         <label className="form-label">Заголовок</label><input className="field" value={title} onChange={event => setTitle(event.target.value)} placeholder="Заголовок рекламного поста" />
-        <label className="form-label">Текст публикации</label><textarea className="field campaign-textarea" value={text} onChange={event => setText(event.target.value)} placeholder="Напишите рекламный текст…" />
+        <label className="form-label">Текст публикации</label><RichTextEditor value={text} onChange={setText} placeholder="Напишите рекламный текст…" minHeight={180} />
         <label className="form-label">Вложения</label><div className="campaign-chips">{assets.map(asset => <span className="btn-chip" key={asset.id}>📎 {asset.file_name}<button onClick={() => void removeAsset(asset.id)} disabled={saving}><X size={11} /></button></span>)}<label className="file-btn"><Paperclip size={14} /> Добавить<input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" style={{display:'none'}} onChange={event => {void uploadFiles(event.target.files);event.target.value=''}} /></label></div>
         <label className="form-label">Кнопки</label><div className="campaign-chips">{buttons.map((row,rowIndex)=>row.map((button,buttonIndex)=><span className="btn-chip" key={`${rowIndex}-${buttonIndex}`}>🔗 {button.text}<button onClick={() => removeButton(rowIndex,buttonIndex)}><X size={11} /></button></span>))}</div>
         <div className="campaign-form-row" style={{marginTop:8}}><input className="field" placeholder="Текст кнопки" value={buttonText} onChange={event => setButtonText(event.target.value)} /><input className="field" placeholder="https://..." value={buttonUrl} onChange={event => setButtonUrl(event.target.value)} /><button className="icon-btn" onClick={addButton} disabled={!buttonText.trim() || !buttonUrl.trim()}><Plus size={15} /></button></div>

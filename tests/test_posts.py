@@ -28,6 +28,14 @@ def _env(monkeypatch):
     monkeypatch.setenv('BOT_TOKEN', 'test-token')
 
 
+def test_sanitize_telegram_html_allows_formatting_and_drops_scripts():
+    from api.posts import sanitize_telegram_html
+    value = sanitize_telegram_html('<b>Жирный</b><script>alert(1)</script><a href="https://example.com">Ссылка</a>')
+    assert '<b>Жирный</b>' in value
+    assert '<a href="https://example.com">Ссылка</a>' in value
+    assert 'script' not in value
+
+
 def test_create_post(monkeypatch):
     created = dict(POST_ROW, status='draft')
     conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, {'id': 5}, created])

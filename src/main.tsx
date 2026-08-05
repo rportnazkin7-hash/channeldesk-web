@@ -11,7 +11,7 @@ try {
   if (typeof tg?.expand === 'function') tg.expand()
   if (typeof tg?.setHeaderColor === 'function') tg.setHeaderColor('#0b0d10')
   if (typeof tg?.setBackgroundColor === 'function') tg.setBackgroundColor('#0b0d10')
-  document.title = 'ChannelDesk v0.44.0'
+  document.title = 'ChannelDesk v0.45.0'
 } catch {}
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: string | null }> {

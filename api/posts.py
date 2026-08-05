@@ -1,6 +1,8 @@
 from __future__ import annotations
 import json
 import uuid
+from html import escape
+from html.parser import HTMLParser
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException
@@ -21,6 +23,68 @@ ALLOWED_STATUSES = {
 CREATABLE = {'idea', 'draft', 'in_progress'}
 EDITABLE = {'idea', 'draft', 'in_progress', 'approved', 'scheduled'}
 PUBLISHED_LOCKED = {'publishing', 'published', 'cancelled'}
+
+
+class _TelegramHtmlSanitizer(HTMLParser):
+    ALLOWED = {'b', 'i', 'u', 's', 'code', 'pre', 'blockquote', 'a', 'br'}
+    BLOCKS = {'div', 'p'}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.out: list[str] = []
+        self.anchor_depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        tag = tag.lower()
+        if tag in self.BLOCKS:
+            return
+        if tag == 'br':
+            self.out.append('<br>')
+        elif tag in self.ALLOWED:
+            if tag == 'a':
+                href = dict(attrs).get('href', '')
+                parsed = urlparse(href)
+                if parsed.scheme in {'http', 'https', 'tg'} and (parsed.scheme == 'tg' or parsed.netloc):
+                    self.out.append(f'<a href="{escape(href, quote=True)}">')
+                    self.anchor_depth += 1
+                else:
+                    return
+            else:
+                self.out.append(f'<{tag}>')
+
+    def handle_startendtag(self, tag, attrs):
+        if tag.lower() == 'br':
+            self.out.append('<br>')
+
+    def handle_endtag(self, tag):
+        tag = tag.lower()
+        if tag in self.BLOCKS:
+            self.out.append('<br>')
+        elif tag == 'a':
+            if self.anchor_depth:
+                self.out.append('</a>')
+                self.anchor_depth -= 1
+        elif tag in self.ALLOWED:
+            self.out.append(f'</{tag}>')
+
+    def handle_data(self, data):
+        self.out.append(escape(data, quote=False))
+
+    def handle_entityref(self, name):
+        self.out.append(f'&{name};')
+
+    def handle_charref(self, name):
+        self.out.append(f'&#{name};')
+
+    def handle_comment(self, data):
+        return
+
+
+def sanitize_telegram_html(value: str) -> str:
+    parser = _TelegramHtmlSanitizer()
+    parser.feed(value or '')
+    parser.close()
+    return ''.join(parser.out).replace('<br><br><br>', '<br><br>')
 
 
 class PostCreate(BaseModel):
@@ -111,14 +175,15 @@ def create_post(workspace_id: int, payload: PostCreate, user: dict = Depends(cur
     if payload.status not in CREATABLE:
         raise HTTPException(422, 'Нельзя создать публикацию в этом статусе')
     buttons = _normalize_buttons(payload.buttons)
+    safe_text = sanitize_telegram_html(payload.text)
     with connect() as conn, conn.cursor() as cur:
         _ensure_channel(cur, workspace_id, payload.channel_id)
         cur.execute("""INSERT INTO cd_posts(workspace_id,channel_id,title,text,status,approval_required,scheduled_at,created_by,buttons)
         VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb) RETURNING *""",
-                    (workspace_id, payload.channel_id, payload.title.strip(), payload.text,
+                    (workspace_id, payload.channel_id, payload.title.strip(), safe_text,
                      payload.status, payload.approval_required, payload.scheduled_at, user['id'], json.dumps(buttons)))
         post = cur.fetchone()
-        if payload.text:
+        if safe_text:
             _save_version(cur, post['id'], post['title'], post['text'], user['id'])
         audit(cur, workspace_id, user['id'], 'post.created', 'post', post['id'])
         return post
@@ -181,6 +246,8 @@ def update_post(workspace_id: int, post_id: int, payload: PostUpdate, user: dict
         if post['status'] not in EDITABLE:
             raise HTTPException(422, 'Редактировать можно только черновики (idea/draft/in_progress)')
         data = payload.model_dump(exclude_unset=True)
+        if 'text' in data:
+            data['text'] = sanitize_telegram_html(data['text'])
         if 'channel_id' in data:
             _ensure_channel(cur, workspace_id, data['channel_id'])
         if 'buttons' in data:
@@ -395,7 +462,7 @@ def create_template(workspace_id: int, payload: TemplateCreate, user: dict = Dep
     with connect() as conn, conn.cursor() as cur:
         cur.execute("""INSERT INTO cd_post_templates(workspace_id,name,title,text,created_by)
         VALUES(%s,%s,%s,%s,%s) RETURNING *""",
-                    (workspace_id, payload.name.strip(), payload.title.strip(), payload.text, user['id']))
+                    (workspace_id, payload.name.strip(), payload.title.strip(), sanitize_telegram_html(payload.text), user['id']))
         row = cur.fetchone()
         audit(cur, workspace_id, user['id'], 'template.created', 'template', row['id'])
         return row
