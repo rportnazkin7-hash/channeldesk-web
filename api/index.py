@@ -17,6 +17,7 @@ from api.tracking import router as tracking_router
 from api.slots import router as slots_router
 from api.exports import router as exports_router
 from api.partner_api import ui_router as integrations_router, partner_router
+from api.public_news import router as public_news_router
 
 
 @asynccontextmanager
@@ -54,6 +55,7 @@ app.include_router(slots_router)
 app.include_router(exports_router)
 app.include_router(integrations_router)
 app.include_router(partner_router)
+app.include_router(public_news_router)
 
 @app.get('/api/health')
 def health():

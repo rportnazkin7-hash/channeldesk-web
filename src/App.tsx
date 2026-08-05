@@ -1,5 +1,5 @@
 import { useCallback,useEffect,useRef,useState } from 'react'
-import { Activity,BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download,Code2 } from 'lucide-react'
+import { Activity,BarChart3,CalendarDays,CirclePlus,Link2,Megaphone,MoreHorizontal,Radio,RefreshCw,Users,Clock,Wallet,LineChart,Settings,Image as ImageIcon,Send,FileText,ChevronLeft,ChevronRight,MessageSquare,History,Trash2,Plus,Paperclip,X,CheckCircle2,Download,Code2,Inbox } from 'lucide-react'
 import { api,type Workspace,type Pending,type Channel,type Member,type Invite,type Post,type Comment,type Version,type Template,type Button,type Asset,type Advertiser,type Booking,type FinanceSummary,type MediaKit,type Task } from './api'
 import Statistics from './Statistics'
 import Analytics from './Analytics'
@@ -63,6 +63,7 @@ export default function App(){
  const [reportUrl,setReportUrl]=useState(''),[reportExpires,setReportExpires]=useState(''),[reportBusy,setReportBusy]=useState(false)
  const [trackingAdvertiserId,setTrackingAdvertiserId]=useState<number|null>(null),[trackingBookingId,setTrackingBookingId]=useState<number|null>(null),[trackingChannelId,setTrackingChannelId]=useState<number|null>(null),[trackingName,setTrackingName]=useState(''),[trackingTarget,setTrackingTarget]=useState(''),[trackingUrl,setTrackingUrl]=useState(''),[trackingBusy,setTrackingBusy]=useState(false)
  const [slotPageChannelId,setSlotPageChannelId]=useState<number|null>(null),[slotPageTitle,setSlotPageTitle]=useState('Рекламные размещения'),[slotPageDescription,setSlotPageDescription]=useState(''),[slotPageCost,setSlotPageCost]=useState(''),[slotPageUrl,setSlotPageUrl]=useState(''),[slotPageBusy,setSlotPageBusy]=useState(false)
+ const [showPublicNews,setShowPublicNews]=useState(false),[newsChannelId,setNewsChannelId]=useState<number|null>(null),[newsPageTitle,setNewsPageTitle]=useState('Предложить новость'),[newsPageDescription,setNewsPageDescription]=useState(''),[newsPageId,setNewsPageId]=useState<number|null>(null),[newsPageUrl,setNewsPageUrl]=useState(''),[newsPageBusy,setNewsPageBusy]=useState(false)
  const [bkAdv,setBkAdv]=useState<number|null>(null),[bkChannel,setBkChannel]=useState<number|null>(null),[bkCost,setBkCost]=useState(''),[bkDate,setBkDate]=useState(''),[bkTime,setBkTime]=useState('12:00'),[bkErid,setBkErid]=useState(''),[bkNoErid,setBkNoErid]=useState(false)
  const [mediaKits,setMediaKits]=useState<MediaKit[]>([])
  const [showMediaKits,setShowMediaKits]=useState(false)
@@ -75,7 +76,7 @@ export default function App(){
  const [showBookingForm,setShowBookingForm]=useState(false)
  const [showCampaignFlow,setShowCampaignFlow]=useState(false)
  const active=spaces.find(x=>x.id===activeId)||spaces[0]||null
- function closeSubviews(){setFabOpen(false);setShowCompose(false);setShowBookingForm(false);setShowCampaignFlow(false);setShowAdvForm(false);setShowTasks(false);setShowMediaKits(false);setShowStatistics(false);setShowAnalytics(false);setShowIntegrations(false);setShowSettings(false)}
+ function closeSubviews(){setFabOpen(false);setShowCompose(false);setShowBookingForm(false);setShowCampaignFlow(false);setShowAdvForm(false);setShowTasks(false);setShowMediaKits(false);setShowStatistics(false);setShowAnalytics(false);setShowIntegrations(false);setShowPublicNews(false);setShowSettings(false)}
  function navigate(next:Tab){buzz();closeSubviews();setTab(next)}
  const [showSettings,setShowSettings]=useState(false)
  const [confirmDelete,setConfirmDelete]=useState(false)
@@ -109,6 +110,8 @@ export default function App(){
  async function revokeAdvertiserReport(id:number){buzz();if(!active)return;setReportBusy(true);setError('');try{await api.revokePublicReport(active.id,id);setReportUrl('');setReportExpires('')}catch(e){setError(e instanceof Error?e.message:'Ошибка отзыва публичного отчёта')}finally{setReportBusy(false)}}
  async function createTrackingLink(){buzz();if(!active)return;if(!trackingChannelId||!trackingName.trim()||!trackingTarget.trim()){setError('Заполните канал, название и целевую ссылку');return}setTrackingBusy(true);setError('');try{const r=await api.createTrackingLink(active.id,{channel_id:trackingChannelId,booking_id:trackingBookingId,name:trackingName.trim(),target_url:trackingTarget.trim()});const full=`${window.location.origin}${r.path}`;setTrackingUrl(full);setTrackingName('');setTrackingTarget('');try{await navigator.clipboard.writeText(full)}catch{void 0}}catch(e){setError(e instanceof Error?e.message:'Ошибка создания ссылки кампании')}finally{setTrackingBusy(false)}}
  async function createSlotPage(){buzz();if(!active)return;if(!slotPageChannelId){setError('Выберите канал для витрины');return}setSlotPageBusy(true);setError('');try{const r=await api.createSlotPage(active.id,slotPageChannelId,{title:slotPageTitle,description:slotPageDescription,default_cost:Number(slotPageCost)||0,currency:'RUB'});const full=`${window.location.origin}${r.path}`;setSlotPageUrl(full);try{await navigator.clipboard.writeText(full)}catch{void 0}}catch(e){setError(e instanceof Error?e.message:'Ошибка создания витрины')}finally{setSlotPageBusy(false)}}
+ async function createPublicNewsPage(){buzz();if(!active)return;setNewsPageBusy(true);setError('');try{const r=await api.createPublicNewsPage(active.id,{channel_id:newsChannelId,title:newsPageTitle,description:newsPageDescription});const full=`${window.location.origin}${r.path}`;setNewsPageId(r.id);setNewsPageUrl(full);try{await navigator.clipboard.writeText(full)}catch{void 0}}catch(e){setError(e instanceof Error?e.message:'Ошибка создания страницы приёма новостей')}finally{setNewsPageBusy(false)}}
+ async function deletePublicNewsPage(){buzz();if(!active||!newsPageId)return;if(!window.confirm('Отключить публичную форму? Ссылка перестанет работать.'))return;try{await api.deletePublicNewsPage(active.id,newsPageId);setNewsPageId(null);setNewsPageUrl('')}catch(e){setError(e instanceof Error?e.message:'Ошибка отключения страницы приёма новостей')}}
  async function addBooking(){buzz();if(!active)return;setError('');try{await api.createBooking(active.id,{advertiser_id:bkAdv??0,cost:Number(bkCost)||0,channel_id:bkChannel,publish_at:bkDate?new Date(`${bkDate}T${bkTime||'12:00'}`).toISOString():null,delete_at:bkDate&&bkTime?new Date(new Date(`${bkDate}T${bkTime||'12:00'}`).getTime()+7*86400000).toISOString():null,erid:bkNoErid?null:(bkErid||null),erid_required:!bkNoErid});setBkAdv(null);setBkCost('');setBkDate('');setBkTime('12:00');setBkErid('');setBkNoErid(false);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка создания брони')}}
  async function payBooking(id:number){buzz();if(!active)return;try{await api.payBooking(active.id,id,'paid');await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка отметки оплаты')}}
  async function delBooking(id:number){buzz();if(!active)return;try{await api.deleteBooking(active.id,id);await load()}catch(e){setError(e instanceof Error?e.message:'Ошибка удаления брони')}}
@@ -264,7 +267,7 @@ export default function App(){
    </div>)}
   </section>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&!showIntegrations&&tab==='overview'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&!showIntegrations&&!showPublicNews&&tab==='overview'&&<>
    {!active&&!loading?<section className="hero"><p>Создайте рабочее пространство агентства.</p><input value={name} onChange={e=>setName(e.target.value)} style={{width:'100%',padding:13,borderRadius:12,border:'1px solid var(--border-2)',background:'var(--field-bg)',color:'white',marginBottom:12}}/><button onClick={create}><CirclePlus size={19}/> Создать</button></section>:<>
     <section className="hero"><span className="eyebrow">{active?.role}</span><p style={{marginTop:8}}>{active?.name}</p><div>{spaces.length>1&&<select value={active?.id} onChange={e=>{buzz();setActiveId(Number(e.target.value))}}>{spaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select>}</div></section>
     {pending.length>0&&<section className="panel" style={{marginTop:16}}><div className="panel-title"><h2>Обнаруженные каналы</h2><Radio size={20}/></div>{pending.map(p=><article key={p.id} style={{padding:'14px 0',borderBottom:'1px solid var(--border)'}}><strong>{p.title}</strong><p style={{color:'var(--muted)',fontSize:12}}>{p.bot_permissions.can_post_messages?'Публикация разрешена':'Нет права публикации'}</p><button onClick={()=>connect(p.id)} disabled={!p.bot_permissions.can_post_messages}>Подключить</button></article>)}</section>}
@@ -285,7 +288,7 @@ export default function App(){
    </>}
   </>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&!showIntegrations&&tab==='posts'&&<section className="panel posts-view">
+  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&!showIntegrations&&!showPublicNews&&tab==='posts'&&<section className="panel posts-view">
    <div className="posts-view-head"><div><span className="eyebrow">КОНТЕНТ</span><h2>Посты</h2></div><FileText size={20}/></div>
    <div className="posts-filters"><input className="field" placeholder="Поиск по постам…" value={postsQuery} onChange={e=>setPostsQuery(e.target.value)}/><select className="field" value={postsChannel??''} onChange={e=>setPostsChannel(e.target.value?Number(e.target.value):null)}><option value="">Все каналы</option>{channels.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}</select></div>
    <div className="posts-status-filter">{(['all','draft','review','scheduled','published'] as const).map(status=><button key={status} className={postsStatus===status?'active':''} onClick={()=>{buzz();setPostsStatus(status)}}>{status==='all'?'Все':status==='draft'?'Черновики':status==='review'?'Согласование':status==='scheduled'?'Запланированы':'Опубликованы'}</button>)}</div>
@@ -293,7 +296,7 @@ export default function App(){
    {postsView.length?postsView.map(renderPostCard):<div className="empty"><p>Постов по выбранным фильтрам нет.</p><button className="primary-btn" onClick={()=>{buzz();setFabOpen(true)}}>Создать пост</button></div>}
   </section>}
 
-  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&!showIntegrations&&tab==='ads'&&<>
+  {!showCompose&&!showTasks&&!showMediaKits&&!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showBookingForm&&!showAdvForm&&!showSettings&&!showIntegrations&&!showPublicNews&&tab==='ads'&&<>
    {!active?<section className="panel"><div className="empty"><div className="empty-icon"><Megaphone/></div><h3>Создайте рабочее пространство</h3><p>Раздел клиентов появится после создания пространства.</p></div></section>:<>
     <section className="panel"><div className="panel-title"><h2>Клиенты</h2><Users size={20}/></div>
      <p style={{color:'var(--muted)',fontSize:12,margin:'4px 0 0'}}>Рекламодатели и размещения. Создание — через «+» внизу.</p>
@@ -403,6 +406,20 @@ export default function App(){
     {draftFiles.length>0&&<div className="chip-wrap">{draftFiles.map((f,i)=><span key={i} className="btn-chip">📎 {f.name.length>22?f.name.slice(0,22)+'…':f.name} <button onClick={()=>{buzz();setDraftFiles(draftFiles.filter((_,j)=>j!==i))}} style={{background:'none',border:0,color:'var(--danger)',padding:'0 2px',marginLeft:4}}><X size={11}/></button></span>)}</div>}
     <div style={{marginTop:14}}><span style={{color:'var(--muted)',fontSize:12}}>Шаблоны: </span>{templates.length?templates.map(t=><button key={t.id} onClick={()=>useTemplate(t)} disabled={busy} className="chip-btn">{t.name}</button>):<span style={{color:'var(--muted-2)',fontSize:12}}>нет</span>}</div>
     <button className="primary-btn" onClick={createDraft} disabled={busy||!newTitle.trim()}><CirclePlus size={18}/> Создать черновик {draftFiles.length?`(${draftFiles.length} вл.)`:''}</button>
+   </>}
+  </section>}
+
+  {showPublicNews&&<section className="panel">
+   <div className="panel-title"><h2>Приём новостей</h2><Inbox size={20}/></div>
+   <button className="back-btn" onClick={()=>{buzz();setShowPublicNews(false)}} style={{marginBottom:12}}>← Назад</button>
+   {!active?<p style={{color:'var(--muted)'}}>Сначала создайте рабочее пространство.</p>:!canManage?<p style={{color:'var(--muted)'}}>Создать публичную форму может только владелец или администратор.</p>:<>
+    <p style={{color:'var(--muted)',fontSize:13,lineHeight:1.5}}>Дайте подписчикам ссылку «Предложить новость». Материал попадёт редактору как черновик и не будет опубликован автоматически.</p>
+    <label className="form-label">Канал назначения</label>
+    <select className="field" value={newsChannelId??''} onChange={e=>setNewsChannelId(e.target.value?Number(e.target.value):null)}><option value="">Без выбранного канала</option>{channels.map(channel=><option key={channel.id} value={channel.id}>{channel.title}</option>)}</select>
+    <label className="form-label">Заголовок страницы</label><input className="field" value={newsPageTitle} onChange={e=>setNewsPageTitle(e.target.value)} placeholder="Предложить новость" />
+    <label className="form-label">Описание для читателей</label><textarea className="field" rows={3} value={newsPageDescription} onChange={e=>setNewsPageDescription(e.target.value)} placeholder="Есть новость, фото или видео? Отправьте материал редакции." />
+    <button className="primary-btn" onClick={()=>void createPublicNewsPage()} disabled={newsPageBusy||!newsPageTitle.trim()}>{newsPageBusy?'Создаю…':'Создать ссылку приёма новостей'}</button>
+    {newsPageUrl&&<div className="invite-box"><p>Ссылка создана и скопирована:</p><code>{newsPageUrl}</code><button className="icon-btn" style={{marginTop:8}} onClick={()=>{buzz();navigator.clipboard?.writeText(newsPageUrl)}}>Скопировать</button><button className="icon-btn danger" style={{marginTop:8,marginLeft:8}} onClick={()=>void deletePublicNewsPage()}>Отключить ссылку</button></div>}
    </>}
   </section>}
 
@@ -571,7 +588,7 @@ export default function App(){
   {showAnalytics&&active&&<Analytics workspaceId={active.id} channels={channels} onBack={()=>{buzz();setShowAnalytics(false)}} onError={setError}/>}
   {showStatistics&&active&&<Statistics workspaceId={active.id} onBack={()=>{buzz();setShowStatistics(false)}} onExport={(format,year,month)=>sendExport('finance',format,{year,month})} onError={setError}/>}
 
-  {!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showMediaKits&&!showTasks&&!showCompose&&!showBookingForm&&!showAdvForm&&!showSettings&&!showIntegrations&&tab==='more'&&<section className="panel"><div className="panel-title"><h2>Ещё</h2><MoreHorizontal size={20}/></div>
+  {!showStatistics&&!showAnalytics&&!showCampaignFlow&&!showMediaKits&&!showTasks&&!showCompose&&!showBookingForm&&!showAdvForm&&!showSettings&&!showIntegrations&&!showPublicNews&&tab==='more'&&<section className="panel"><div className="panel-title"><h2>Ещё</h2><MoreHorizontal size={20}/></div>
    {[
     {icon:Megaphone,label:'Каналы',desc:'Управление подключёнными каналами',action:()=>goSection('channels-section')},
     {icon:Users,label:'Команда',desc:'Участники и приглашения',action:()=>goSection('team-section')},
@@ -581,6 +598,7 @@ export default function App(){
     {icon:Activity,label:'Аналитика каналов',desc:'Охват, просмотры, ссылки и метрики',action:()=>{buzz();if(active)setShowAnalytics(true);else setError('Сначала создайте рабочее пространство')}},
     {icon:ImageIcon,label:'Медиакиты',desc:'Презентация для рекламодателей',action:()=>{buzz();setShowMediaKits(true)}},
     {icon:Code2,label:'Интеграции',desc:'API и webhook-и для сайтов и CRM',action:()=>{buzz();if(active)setShowIntegrations(true);else setError('Сначала создайте рабочее пространство')}},
+    {icon:Inbox,label:'Приём новостей',desc:'Публичная форма для материалов от подписчиков',action:()=>{buzz();if(active)setShowPublicNews(true);else setError('Сначала создайте рабочее пространство')}},
     {icon:Settings,label:'Настройки',desc:'Пространство и уведомления',action:()=>{buzz();setShowSettings(true)}},
    ].map(item=>{
     const I=item.icon

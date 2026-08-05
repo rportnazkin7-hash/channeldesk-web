@@ -39,6 +39,7 @@ export type AnalyticsSummary={subscribers:number;reactions:number;posts_count:nu
 export type AnalyticsOverview={from_date:string;to_date:string;metrics:ChannelMetric[];links:TrackingLink[];summary:AnalyticsSummary;data_source:'telegram_bot_api'}
 export type MediaKit={id:number;name:string;channel_id:number|null;channel_title:string|null;description:string;audience:Record<string,unknown>;stats:Record<string,unknown>;pricing:unknown[];contacts:Record<string,unknown>;is_active:boolean}
 export type Task={id:number;title:string;description:string;status:'todo'|'in_progress'|'done'|'cancelled';priority:'low'|'normal'|'high'|'urgent';assignee_id:number|null;due_at:string|null;remind_at:string|null;assignee_username:string|null;assignee_first_name:string|null}
+export type PublicNewsPage={title:string;description:string;channel_title:string|null;channel_id:number|null}
 export type UploadTicket={asset_id:number;file_url:string;upload_url:string;anon_key:string;bucket:string}
 async function uploadDirect(ticket:UploadTicket,file:File):Promise<void>{
  const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),90000)
@@ -63,6 +64,11 @@ export const api={
   webhooks:(wid:number)=>req<Webhook[]>(`/api/workspaces/${wid}/webhooks`),
   createWebhook:(wid:number,p:{name:string;url:string;events:string[]})=>req<Webhook & {secret:string}>(`/api/workspaces/${wid}/webhooks`,{method:'POST',body:JSON.stringify(p)}),
   deleteWebhook:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/webhooks/${id}`,{method:'DELETE'}),
+  createPublicNewsPage:(wid:number,p:{channel_id:number|null;title:string;description:string})=>req<{id:number;title:string;description:string;channel_id:number|null;path:string}>(`/api/workspaces/${wid}/public-news-pages`,{method:'POST',body:JSON.stringify(p)}),
+  deletePublicNewsPage:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/public-news-pages/${id}`,{method:'DELETE'}),
+  publicNewsPage:(token:string)=>req<PublicNewsPage>(`/api/public-news/${encodeURIComponent(token)}`),
+  publicNewsUploadUrl:(token:string,p:{file_name:string;content_type:string;size:number})=>req<UploadTicket>(`/api/public-news/${encodeURIComponent(token)}/upload-url`,{method:'POST',body:JSON.stringify(p)}),
+  publicNewsSubmit:(token:string,p:{title:string;text:string;contact_name:string;contact_telegram:string;contact_email:string;source_url:string;is_anonymous:boolean;asset_ids:number[]})=>req<{request_id:number;post_id:number;message:string}>(`/api/public-news/${encodeURIComponent(token)}/submit`,{method:'POST',body:JSON.stringify(p)}),
   pending:()=>req<Pending[]>('/api/channel-connections/pending'),
  channels:(wid:number)=>req<Channel[]>(`/api/workspaces/${wid}/channels`),
  connect:(wid:number,id:number)=>req<Channel>(`/api/workspaces/${wid}/channels/connect`,{method:'POST',body:JSON.stringify({connection_id:id})}),

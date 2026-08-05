@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import App from './App'
 import PublicReport from './PublicReport'
 import PublicSlots from './PublicSlots'
+import PublicNews from './PublicNews'
 import './styles.css'
 
 const tg = window.Telegram?.WebApp
@@ -38,7 +39,8 @@ if (!root) throw new Error('Root element not found')
 const query = new URLSearchParams(window.location.search)
 const publicReportToken = window.location.pathname === '/public-report' ? query.get('token') : null
 const publicSlotsToken = window.location.pathname === '/public-slots' ? query.get('token') : null
-createRoot(root).render(<React.StrictMode><ErrorBoundary>{publicReportToken ? <PublicReport token={publicReportToken} /> : publicSlotsToken ? <PublicSlots token={publicSlotsToken} /> : <App />}</ErrorBoundary></React.StrictMode>)
+const publicNewsToken = window.location.pathname === '/public-news' ? query.get('token') : null
+createRoot(root).render(<React.StrictMode><ErrorBoundary>{publicReportToken ? <PublicReport token={publicReportToken} /> : publicSlotsToken ? <PublicSlots token={publicSlotsToken} /> : publicNewsToken ? <PublicNews token={publicNewsToken} /> : <App />}</ErrorBoundary></React.StrictMode>)
 
 declare global {
   interface Window {

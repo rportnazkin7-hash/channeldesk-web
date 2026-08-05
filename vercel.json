@@ -5,7 +5,8 @@
     { "source": "/redoc", "destination": "/api/index.py" },
     { "source": "/openapi.json", "destination": "/api/index.py" },
     { "source": "/public-report", "destination": "/index.html" },
-    { "source": "/public-slots", "destination": "/index.html" }
+    { "source": "/public-slots", "destination": "/index.html" },
+    { "source": "/public-news", "destination": "/index.html" }
   ],
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
