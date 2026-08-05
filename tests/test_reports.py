@@ -13,7 +13,7 @@ USER_ROW = {'id': 1, 'telegram_id': 123456789, 'username': 'developer', 'first_n
 MEMBER_ADMIN = {'id': 2, 'workspace_id': 3, 'user_id': 1, 'role': 'admin', 'status': 'active', 'channel_scope': []}
 ADVERTISER = {'id': 4, 'name': 'ООО Реклама'}
 REPORT_ROW = {'id': 9, 'expires_at': datetime.now(timezone.utc) + timedelta(days=30)}
-BOOKING = {'id': 10, 'format': 'post', 'cost': 5000, 'currency': 'RUB', 'status': 'done',
+BOOKING = {'id': 10, 'post_id': 20, 'post_status': 'review', 'format': 'post', 'cost': 5000, 'currency': 'RUB', 'status': 'done',
            'payment_status': 'paid', 'publish_at': None, 'delete_at': None, 'channel_title': 'Новости'}
 
 
@@ -43,6 +43,20 @@ def test_get_public_report(monkeypatch):
     assert r.status_code == 200
     assert r.json()['advertiser_name'] == 'ООО Реклама'
     assert r.json()['bookings'][0]['channel_title'] == 'Новости'
+
+
+def test_public_feedback_approves_post(monkeypatch):
+    report = REPORT_ROW | {'workspace_id': 3, 'advertiser_id': 4, 'advertiser_name': 'ООО Реклама'}
+    booking = {'id': 10, 'workspace_id': 3, 'advertiser_id': 4, 'post_id': 20, 'post_status': 'review'}
+    feedback = {'id': 1, 'decision': 'approved', 'comment': '', 'created_at': None}
+    conn = patch_db(monkeypatch, [report, booking, feedback])
+    monkeypatch.setattr('api.reports.connect', lambda: conn)
+    r = client.post('/api/public/reports/token/bookings/10/feedback', json={'decision': 'approved'})
+    assert r.status_code == 201
+    assert r.json()['decision'] == 'approved'
+    sql = ' '.join(call[0] for cur in conn.cursors for call in cur.calls)
+    assert 'cd_public_report_feedback' in sql
+    assert "status=%s" in sql
 
 
 def test_public_report_expired(monkeypatch):

@@ -317,6 +317,20 @@ nav button.active svg{filter:drop-shadow(0 0 6px #10b98155)}
 .public-booking-dates{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px;color:var(--muted);font-size:11px}
 .public-booking-dates span{display:inline-flex;align-items:center;gap:4px}
 .public-booking-ok{display:flex;align-items:center;gap:5px;margin-top:8px;color:var(--accent-2);font-size:11px}
+.public-post-preview{margin-top:12px;padding:11px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2)}
+.public-post-preview strong{color:var(--text);font-size:12px}
+.public-post-preview p{margin:7px 0 0;color:var(--text-2);font-size:12px;line-height:1.5;white-space:pre-wrap;max-height:180px;overflow:auto}
+.public-feedback{margin-top:12px;padding-top:11px;border-top:1px solid var(--border)}
+.public-feedback-title{color:var(--text);font-size:12px;font-weight:700}
+.public-feedback-actions{display:flex;gap:7px;margin-top:9px}
+.public-feedback-actions button,.public-feedback-form button{border:1px solid var(--accent-border);background:var(--accent-soft);color:var(--accent-2);border-radius:9px;padding:8px 10px;font:600 11px inherit}
+.public-feedback-actions button:nth-child(2){border-color:var(--warn-border);background:var(--warn-bg);color:var(--warn)}
+.public-feedback-form{margin-top:8px}
+.public-feedback-form textarea{display:block;width:100%;min-height:70px;resize:vertical;border:1px solid var(--border-2);border-radius:9px;background:var(--field-bg);color:var(--text);padding:9px;font:12px inherit}
+.public-feedback-form button{margin-top:7px}
+.public-feedback-state{display:flex;align-items:flex-start;gap:5px;margin-top:8px;font-size:11px;line-height:1.4}
+.public-feedback-state.approved{color:var(--accent-2)}
+.public-feedback-state.changes_requested{color:var(--warn)}
 .public-report-empty,.public-report-state{display:flex;flex-direction:column;align-items:center;gap:9px;padding:38px 10px;color:var(--muted);text-align:center;font-size:12px}
 .public-report-state strong{color:var(--text);font-size:16px}
 .public-report-links{margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
