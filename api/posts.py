@@ -327,7 +327,20 @@ def cancel_post(workspace_id: int, post_id: int, user: dict = Depends(current_us
             raise HTTPException(422, 'Эту публикацию нельзя отменить')
         cur.execute("UPDATE cd_posts SET status='cancelled',updated_at=now() WHERE id=%s RETURNING *", (post_id,))
         updated = cur.fetchone()
+        # Рекламный пост и его размещение — одна кампания. Если пост отменили
+        # из вкладки «Посты», связанная бронь не должна оставаться заявкой
+        # или подтверждённой: иначе во вкладке «Клиенты» показывается старый
+        # этап той же самой кампании.
+        cur.execute("""UPDATE cd_ad_bookings
+        SET status='cancelled',updated_at=now()
+        WHERE workspace_id=%s AND post_id=%s
+          AND status IN ('requested','confirmed','active','overdue')
+        RETURNING id""", (workspace_id, post_id))
+        linked_bookings = cur.fetchall()
         audit(cur, workspace_id, user['id'], 'post.cancelled', 'post', post_id)
+        for booking in linked_bookings:
+            audit(cur, workspace_id, user['id'], 'booking.cancelled', 'booking', booking['id'],
+                  json.dumps({'reason': 'post_cancelled', 'post_id': post_id}))
         return updated
 
 

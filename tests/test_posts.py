@@ -138,6 +138,27 @@ def test_workflow_submit_approve_schedule(monkeypatch):
     assert body['publish_key']
 
 
+def test_cancel_ad_post_cancels_linked_bookings(monkeypatch):
+    """Отмена рекламного поста должна закрыть связанные заявки/брони."""
+    cancelled_post = dict(POST_ROW, status='cancelled')
+    linked_bookings = [{'id': 5}, {'id': 6}]
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, POST_ROW, cancelled_post, linked_bookings])
+    monkeypatch.setattr('api.posts.connect', lambda: conn)
+
+    r = client.post('/api/workspaces/3/posts/10/cancel', headers=auth_headers())
+
+    assert r.status_code == 200
+    assert r.json()['status'] == 'cancelled'
+    calls = [call for cur in conn.cursors for call in cur.calls]
+    booking_update = next((call for call in calls if 'UPDATE cd_ad_bookings' in call[0]), None)
+    assert booking_update is not None
+    assert "status IN ('requested','confirmed','active','overdue')" in booking_update[0]
+    assert booking_update[1] == (3, 10)
+    audit_actions = [params[2] for sql, params in calls if 'INSERT INTO cd_audit_log' in sql and params]
+    assert 'post.cancelled' in audit_actions
+    assert audit_actions.count('booking.cancelled') == 2
+
+
 def test_request_delete_from_telegram(monkeypatch):
     published = dict(POST_ROW, status='published', telegram_message_id=555)
     conn = patch_db(monkeypatch, [USER_ROW, MEMBER_OWNER, published, {'telegram_chat_id': -100123}, None, {'id': 7, 'status': 'pending'}])
