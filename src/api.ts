@@ -25,6 +25,7 @@ export type Version={id:number;title:string;text:string;created_by:number|null;c
 export type Template={id:number;name:string;title:string;text:string}
 export type Asset={id:number;file_name:string;file_type:string;file_url:string;size_bytes:number|null}
 export type Advertiser={id:number;name:string;contact:Record<string,string>|null;notes:string;is_active:boolean}
+export type PublicFeedbackItem={id:number;booking_id:number;post_id:number|null;decision:'approved'|'changes_requested';comment:string;created_at:string;advertiser_name:string;format:string;publish_at:string|null;channel_title:string|null;post_title:string|null}
 export type Booking={id:number;advertiser_id:number;channel_id:number|null;post_id:number|null;format:string;cost:number;currency:string;status:string;payment_status:string;publish_at:string|null;delete_at:string|null;erid:string|null;erid_required:boolean;materials_url:string|null;report_url:string|null;advertiser_name:string|null;channel_title:string|null}
 export type FinanceTx={id:number;booking_id:number|null;type:'income'|'expense';amount:number;currency:string;category:string;description:string;occurred_at:string;advertiser_name?:string|null;channel_title?:string|null}
 export type FinanceTrend={year:number;month:number;income:number;expense:number;profit:number}
@@ -109,5 +110,6 @@ export const api={
  completeTask:(wid:number,id:number)=>req<Task>(`/api/workspaces/${wid}/tasks/${id}/done`,{method:'POST'}),
  deleteTask:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/tasks/${id}`,{method:'DELETE'}),
   requestExport:(wid:number,kind:'posts'|'bookings'|'finance'|'media_kits',format:'csv'|'xlsx'|'pdf',period?:{year:number;month:number})=>req<{id:number;kind:string;format:string;status:string;message:string}>(`/api/workspaces/${wid}/exports`,{method:'POST',body:JSON.stringify({kind,format,...(period?{period_year:period.year,period_month:period.month}:{})})}),
- exportsStatus:(wid:number)=>req<{id:number;kind:string;format:string;status:string;error_text:string|null;created_at:string;completed_at:string|null}[]>(`/api/workspaces/${wid}/exports`),
+  exportsStatus:(wid:number)=>req<{id:number;kind:string;format:string;status:string;error_text:string|null;created_at:string;completed_at:string|null}[]>(`/api/workspaces/${wid}/exports`),
+  publicReportFeedback:(wid:number)=>req<PublicFeedbackItem[]>(`/api/workspaces/${wid}/public-report-feedback`),
 }
