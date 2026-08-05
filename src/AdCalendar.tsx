@@ -14,7 +14,7 @@ function fmt(value:string|null){if(!value)return '—';try{return new Date(value
 
 export default function AdCalendar({bookings,channels}:Props){
  const now=new Date();const [year,setYear]=useState(now.getFullYear());const [month,setMonth]=useState(now.getMonth());const [selected,setSelected]=useState<Date|null>(null);const [channelId,setChannelId]=useState<number|null>(null)
- const filtered=bookings.filter(b=>channelId==null||b.channel_id===channelId)
+  const filtered=bookings.filter(b=>['requested','confirmed','active'].includes(b.status)&&(channelId==null||b.channel_id===channelId))
  const cells=monthGrid(year,month)
  const selectedBookings=selected?filtered.filter(b=>atDay(b,selected)):[]
  const today=dayKey(new Date())

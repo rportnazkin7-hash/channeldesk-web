@@ -79,6 +79,20 @@ def test_create_booking_rejects_overlapping_channel_slot(monkeypatch):
     }, headers=auth_headers())
     assert r.status_code == 409
     assert 'занят' in r.json()['detail']
+    sql = ' '.join(call[0] for cur in conn.cursors for call in cur.calls)
+    assert "status IN ('requested','confirmed','active')" in sql
+
+
+def test_cancelled_booking_does_not_block_new_slot(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    start = datetime.now(timezone.utc) + timedelta(days=1)
+    created = dict(BOOKING_ROW, status='requested', publish_at=start, delete_at=start + timedelta(days=7), post_id=77)
+    conn = patch_db(monkeypatch, [USER_ROW, MEMBER_ADMIN, {'id': 1}, {'id': 9}, None, created, {'name': 'ООО Реклама'}, {'id': 77}])
+    monkeypatch.setattr('api.ads.connect', lambda: conn)
+    r = client.post('/api/workspaces/3/bookings', json={
+        'advertiser_id': 1, 'channel_id': 9, 'cost': 1000, 'publish_at': start.isoformat(),
+    }, headers=auth_headers())
+    assert r.status_code == 201
 
 
 def test_create_booking_rejects_invalid_period(monkeypatch):

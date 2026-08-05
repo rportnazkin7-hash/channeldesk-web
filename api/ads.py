@@ -168,7 +168,7 @@ def _validate_schedule_conflict(cur, workspace_id: int, channel_id: int | None,
              FROM cd_ad_bookings b
              LEFT JOIN cd_advertisers a ON a.id=b.advertiser_id
              WHERE b.workspace_id=%s AND b.channel_id=%s
-               AND b.status NOT IN ('cancelled','done','overdue')
+               AND b.status IN ('requested','confirmed','active')
                AND b.publish_at IS NOT NULL
                AND b.publish_at < %s
                AND COALESCE(b.delete_at,b.publish_at + interval '7 days') > %s"""
