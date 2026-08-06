@@ -142,7 +142,8 @@ def public_news_upload_url(token: str, payload: PublicNewsUpload):
 
 
 def _notify_workspace(workspace_id: int, post_id: int, request_id: int,
-                      title: str, contact_name: str, is_anonymous: bool) -> None:
+                      title: str, contact_name: str, contact_telegram: str,
+                      contact_email: str, is_anonymous: bool) -> None:
     """Best-effort notification to workspace owners/admins through Bot API."""
     try:
         from api.telegram import _get_json
@@ -155,8 +156,13 @@ def _notify_workspace(workspace_id: int, post_id: int, request_id: int,
         text = f'📰 Новая заявка в редакцию\n{title or "Без заголовка"}\nЗаявка #{request_id}'
         if is_anonymous:
             text += '\nИсточник: анонимно'
-        elif contact_name.strip():
-            text += f'\nАвтор: {contact_name.strip()}'
+        else:
+            if contact_name.strip():
+                text += f'\nАвтор: {contact_name.strip()}'
+            if contact_telegram.strip():
+                text += f'\nTelegram: {contact_telegram.strip()}'
+            if contact_email.strip():
+                text += f'\nEmail: {contact_email.strip()}'
         mini_url = os.getenv('MINI_APP_URL', '').strip()
         markup = None
         if mini_url:
@@ -192,15 +198,21 @@ def submit_public_news(token: str, payload: PublicNewsSubmit):
         page = _page(cur, token)
         if not page:
             raise HTTPException(404, 'Страница приёма новостей не найдена или отключена')
+        # Простая защита публичной формы от случайного/массового спама.
+        cur.execute("""SELECT count(*) AS cnt FROM cd_public_news_requests
+        WHERE page_id=%s AND created_at>now()-interval '10 minutes'""", (page['id'],))
+        if int(cur.fetchone()['cnt'] or 0) >= 20:
+            raise HTTPException(429, 'Форма временно перегружена. Попробуйте позже.')
         asset_rows = []
         if payload.asset_ids:
             placeholders = ','.join(['%s'] * len(payload.asset_ids))
             cur.execute(f"""SELECT id,file_name,file_type,file_url,size_bytes
             FROM cd_content_assets
             WHERE id IN ({placeholders}) AND workspace_id=%s
+              AND file_url LIKE %s
               AND post_id IS NULL
               AND created_at>now()-interval '2 hours'""",
-                        [*payload.asset_ids, page['workspace_id']])
+                        [*payload.asset_ids, page['workspace_id'], f"%/{page['workspace_id']}/public-news/{page['id']}/%"])
             asset_rows = cur.fetchall() or []
             if len(asset_rows) != len(set(payload.asset_ids)):
                 raise HTTPException(422, 'Одно из вложений устарело. Загрузите файлы ещё раз.')
@@ -228,6 +240,7 @@ def submit_public_news(token: str, payload: PublicNewsSubmit):
         VALUES(%s,NULL,'public_news.submitted','post',%s,%s::jsonb)""",
                     (page['workspace_id'], post['id'], json.dumps({'request_id': request['id']})))
     _notify_workspace(page['workspace_id'], post['id'], request['id'], title,
-                      payload.contact_name, payload.is_anonymous)
+                      payload.contact_name, payload.contact_telegram, payload.contact_email,
+                      payload.is_anonymous)
     return {'request_id': request['id'], 'post_id': post['id'],
             'message': 'Материал отправлен редактору. Спасибо!'}

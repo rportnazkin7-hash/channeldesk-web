@@ -47,7 +47,7 @@ def test_get_public_news_page(monkeypatch):
 def test_submit_public_news_creates_draft(monkeypatch):
     post = {'id': 77}
     request = {'id': 41}
-    conn = patch_db(monkeypatch, [PAGE_ROW, post, request, []])
+    conn = patch_db(monkeypatch, [PAGE_ROW, {'cnt': 0}, post, request, []])
     monkeypatch.setattr('api.public_news.connect', lambda: conn)
     r = client.post('/api/public-news/public-token/submit', json={
         'title': 'Новость от читателя',

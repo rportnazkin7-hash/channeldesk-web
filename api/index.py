@@ -59,7 +59,7 @@ app.include_router(public_news_router)
 
 @app.get('/api/health')
 def health():
-    return {'ok': True, 'service': 'ChannelDesk API', 'version': '0.45.0'}
+    return {'ok': True, 'service': 'ChannelDesk API', 'version': '0.47.0'}
 
 
 @app.get('/api/health/db-hash')
