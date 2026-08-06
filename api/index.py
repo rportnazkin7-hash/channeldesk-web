@@ -19,6 +19,7 @@ from api.exports import router as exports_router
 from api.partner_api import ui_router as integrations_router, partner_router
 from api.public_news import router as public_news_router
 from api.snapshot import router as snapshot_router
+from api.bug_reports import router as bug_reports_router
 
 
 @asynccontextmanager
@@ -58,6 +59,7 @@ app.include_router(integrations_router)
 app.include_router(partner_router)
 app.include_router(public_news_router)
 app.include_router(snapshot_router)
+app.include_router(bug_reports_router)
 
 @app.get('/api/health')
 def health():

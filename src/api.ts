@@ -40,6 +40,7 @@ export type AnalyticsOverview={from_date:string;to_date:string;metrics:ChannelMe
 export type MediaKit={id:number;name:string;channel_id:number|null;channel_title:string|null;description:string;audience:Record<string,unknown>;stats:Record<string,unknown>;pricing:unknown[];contacts:Record<string,unknown>;is_active:boolean}
 export type Task={id:number;title:string;description:string;status:'todo'|'in_progress'|'done'|'cancelled';priority:'low'|'normal'|'high'|'urgent';assignee_id:number|null;due_at:string|null;remind_at:string|null;assignee_username:string|null;assignee_first_name:string|null}
 export type PublicNewsPage={title:string;description:string;channel_title:string|null;channel_id:number|null}
+export type BugReport={id:number;workspace_id:number|null;user_id:number|null;telegram_id:number|null;username:string|null;first_name:string|null;description:string;screen:string;severity:'low'|'normal'|'high'|'critical';source:string;app_version:string;status:'new'|'in_progress'|'fixed'|'closed';resolution:string;created_at:string;updated_at:string;resolved_at:string|null}
 export type UploadTicket={asset_id:number;file_url:string;upload_url:string;anon_key:string;bucket:string}
 async function uploadDirect(ticket:UploadTicket,file:File):Promise<void>{
  const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),90000)
@@ -69,6 +70,9 @@ export const api={
   publicNewsPage:(token:string)=>req<PublicNewsPage>(`/api/public-news/${encodeURIComponent(token)}`),
   publicNewsUploadUrl:(token:string,p:{file_name:string;content_type:string;size:number})=>req<UploadTicket>(`/api/public-news/${encodeURIComponent(token)}/upload-url`,{method:'POST',body:JSON.stringify(p)}),
   publicNewsSubmit:(token:string,p:{title:string;text:string;contact_name:string;contact_telegram:string;contact_email:string;source_url:string;is_anonymous:boolean;asset_ids:number[]})=>req<{request_id:number;post_id:number;message:string}>(`/api/public-news/${encodeURIComponent(token)}/submit`,{method:'POST',body:JSON.stringify(p)}),
+  bugReports:(wid:number)=>req<BugReport[]>(`/api/workspaces/${wid}/bug-reports`),
+  createBugReport:(wid:number,p:{description:string;screen:string;severity:string;app_version:string;context?:Record<string,unknown>})=>req<BugReport>(`/api/workspaces/${wid}/bug-reports`,{method:'POST',body:JSON.stringify(p)}),
+  updateBugReport:(wid:number,id:number,p:{status?:string;resolution?:string})=>req<BugReport>(`/api/workspaces/${wid}/bug-reports/${id}`,{method:'PATCH',body:JSON.stringify(p)}),
   pending:()=>req<Pending[]>('/api/channel-connections/pending'),
  channels:(wid:number)=>req<Channel[]>(`/api/workspaces/${wid}/channels`),
  workspaceSnapshot:(wid:number)=>req<{pending:Pending[];channels:Channel[];members:Member[];posts:Post[];templates:Template[];advertisers:Advertiser[];bookings:Booking[];feedback:PublicFeedbackItem[];finance_summary:FinanceSummary|null;media_kits:MediaKit[];tasks:Task[]}>(`/api/workspaces/${wid}/snapshot`),
