@@ -71,6 +71,7 @@ export const api={
   publicNewsSubmit:(token:string,p:{title:string;text:string;contact_name:string;contact_telegram:string;contact_email:string;source_url:string;is_anonymous:boolean;asset_ids:number[]})=>req<{request_id:number;post_id:number;message:string}>(`/api/public-news/${encodeURIComponent(token)}/submit`,{method:'POST',body:JSON.stringify(p)}),
   pending:()=>req<Pending[]>('/api/channel-connections/pending'),
  channels:(wid:number)=>req<Channel[]>(`/api/workspaces/${wid}/channels`),
+ workspaceSnapshot:(wid:number)=>req<{pending:Pending[];channels:Channel[];members:Member[];posts:Post[];templates:Template[];advertisers:Advertiser[];bookings:Booking[];feedback:PublicFeedbackItem[];finance_summary:FinanceSummary|null;media_kits:MediaKit[];tasks:Task[]}>(`/api/workspaces/${wid}/snapshot`),
  connect:(wid:number,id:number)=>req<Channel>(`/api/workspaces/${wid}/channels/connect`,{method:'POST',body:JSON.stringify({connection_id:id})}),
  deleteChannel:(wid:number,id:number)=>req<void>(`/api/workspaces/${wid}/channels/${id}`,{method:'DELETE'}),
  members:(wid:number)=>req<Member[]>(`/api/workspaces/${wid}/members`),

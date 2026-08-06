@@ -21,6 +21,7 @@ def test_database_url_normalizes_dialects(monkeypatch):
 def test_connect_unreachable_returns_503(monkeypatch):
     # Порт 1 на localhost — гарантированный отказ соединения, быстрый, без внешних зависимостей
     monkeypatch.setenv('DATABASE_URL', 'postgresql://user:pass@127.0.0.1:1/nonexistent')
+    monkeypatch.setenv('DB_POOL_ENABLED', 'false')
     with pytest.raises(HTTPException) as exc:
         connect()
     assert exc.value.status_code == 503

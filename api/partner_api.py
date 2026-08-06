@@ -3,7 +3,11 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import os
 import secrets
+import threading
+import time
+from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from urllib.parse import urlparse
@@ -33,6 +37,8 @@ ALLOWED_SCOPES = {
 }
 DEFAULT_SCOPES = ['drafts:create', 'posts:read', 'channels:read']
 partner_bearer = HTTPBearer(auto_error=False)
+_rate_lock = threading.Lock()
+_rate_hits: dict[int, deque[float]] = defaultdict(deque)
 WEBHOOK_EVENTS = {
     'post.created',
     'post.submitted',
@@ -103,6 +109,26 @@ def _api_key_from_header(authorization: str | None) -> str:
     return token
 
 
+def _check_partner_rate_limit(api_key_id: int) -> None:
+    try:
+        limit = max(10, min(1000, int(os.getenv('PARTNER_API_RATE_LIMIT', '120'))))
+    except ValueError:
+        limit = 120
+    now = time.monotonic()
+    with _rate_lock:
+        hits = _rate_hits[api_key_id]
+        while hits and now - hits[0] >= 60:
+            hits.popleft()
+        if len(hits) >= limit:
+            raise HTTPException(429, 'Слишком много запросов Partner API. Повторите позже.',
+                                headers={'Retry-After': '60'})
+        hits.append(now)
+        if len(_rate_hits) > 10000:
+            stale = [key for key, values in _rate_hits.items() if not values or now - values[-1] > 300]
+            for key in stale:
+                _rate_hits.pop(key, None)
+
+
 def partner_api_key(credentials: HTTPAuthorizationCredentials | None = Depends(partner_bearer)) -> dict:
     token = _api_key_from_header(
         f'{credentials.scheme} {credentials.credentials}' if credentials else None
@@ -117,6 +143,7 @@ def partner_api_key(credentials: HTTPAuthorizationCredentials | None = Depends(p
         key = cur.fetchone()
         if not key:
             raise HTTPException(401, 'API-ключ не найден, отозван или просрочен')
+        _check_partner_rate_limit(key['id'])
         cur.execute('UPDATE cd_api_keys SET last_used_at=now(),updated_at=now() WHERE id=%s', (key['id'],))
     return key
 
