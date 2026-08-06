@@ -4,8 +4,8 @@ import hashlib
 import hmac
 import json
 import secrets
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
@@ -160,23 +160,35 @@ def _webhook_request(event: str, payload: dict, webhook: dict) -> None:
             raise RuntimeError(f'HTTP {response.status}')
 
 
+def _deliver_one_webhook(event: str, payload: dict, webhook: dict) -> None:
+    try:
+        _webhook_request(event, payload, webhook)
+        with connect() as conn, conn.cursor() as cur:
+            cur.execute("""UPDATE cd_api_webhooks SET last_delivered_at=now(),last_error=NULL,updated_at=now()
+            WHERE id=%s""", (webhook['id'],))
+    except Exception as exc:  # noqa: BLE001
+        try:
+            with connect() as conn, conn.cursor() as cur:
+                cur.execute("""UPDATE cd_api_webhooks SET last_error=%s,updated_at=now()
+                WHERE id=%s""", (str(exc)[:500], webhook['id']))
+        except Exception:
+            pass
+
+
 def emit_webhook_event(workspace_id: int, event: str, payload: dict) -> None:
-    """Best-effort delivery for the small MVP webhook layer."""
+    """Best-effort delivery for the small MVP webhook layer.
+
+    Deliveries are parallelised and capped at five endpoints so a slow external
+    service cannot serially block the whole request for every webhook.
+    """
     try:
         with connect() as conn, conn.cursor() as cur:
             cur.execute("""SELECT id,url,secret FROM cd_api_webhooks
             WHERE workspace_id=%s AND is_active=true AND events ? %s""", (workspace_id, event))
             webhooks = cur.fetchall() or []
-        for webhook in webhooks[:5]:
-            try:
-                _webhook_request(event, payload, webhook)
-                with connect() as conn, conn.cursor() as cur:
-                    cur.execute("""UPDATE cd_api_webhooks SET last_delivered_at=now(),last_error=NULL,updated_at=now()
-                    WHERE id=%s""", (webhook['id'],))
-            except Exception as exc:  # noqa: BLE001
-                with connect() as conn, conn.cursor() as cur:
-                    cur.execute("""UPDATE cd_api_webhooks SET last_error=%s,updated_at=now()
-                    WHERE id=%s""", (str(exc)[:500], webhook['id']))
+        if webhooks:
+            with ThreadPoolExecutor(max_workers=min(5, len(webhooks))) as executor:
+                list(executor.map(lambda hook: _deliver_one_webhook(event, payload, hook), webhooks[:5]))
     except Exception:
         # Webhook failure must never break creation of a post.
         return

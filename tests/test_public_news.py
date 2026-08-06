@@ -63,6 +63,13 @@ def test_submit_public_news_creates_draft(monkeypatch):
     assert 'INSERT INTO cd_public_news_requests' in sql
 
 
+def test_public_news_rate_limit(monkeypatch):
+    conn = patch_db(monkeypatch, [PAGE_ROW, {'cnt': 20}])
+    monkeypatch.setattr('api.public_news.connect', lambda: conn)
+    r = client.post('/api/public-news/public-token/submit', json={'text': 'Спам'})
+    assert r.status_code == 429
+
+
 def test_public_news_upload_ticket(monkeypatch):
     conn = patch_db(monkeypatch, [PAGE_ROW, {'id': 5}])
     monkeypatch.setattr('api.public_news.connect', lambda: conn)
