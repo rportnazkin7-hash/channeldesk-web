@@ -28,8 +28,20 @@ def admin_ids() -> set[int]:
     }
 
 
+def beta_tester_ids() -> set[int]:
+    return {
+        int(raw.strip())
+        for raw in os.getenv('BETA_TESTER_IDS', '').split(',')
+        if raw.strip().isdigit()
+    }
+
+
 def is_admin(user_id: int) -> bool:
     return user_id in admin_ids()
+
+
+def is_beta_tester(user_id: int) -> bool:
+    return user_id in beta_tester_ids()
 
 
 def zbt_enabled() -> bool:
@@ -67,6 +79,8 @@ def require_access(user_id: int) -> None:
             status_code=403,
             detail=f'Чтобы пользоваться ChannelDesk, подпишитесь на канал {required_channel_url()}.',
         )
+    if is_beta_tester(user_id):
+        return
     if zbt_enabled():
         raise HTTPException(
             status_code=423,

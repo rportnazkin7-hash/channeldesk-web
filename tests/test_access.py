@@ -39,6 +39,15 @@ def test_subscribed_user_sees_zbt(monkeypatch):
 
 def test_subscribed_user_can_enter_when_zbt_disabled(monkeypatch):
     monkeypatch.setenv('ADMIN_IDS', '999')
+    monkeypatch.setenv('BETA_TESTER_IDS', '')
     monkeypatch.setenv('ZBT_ENABLED', 'false')
+    monkeypatch.setattr(access, 'required_channel_subscription', lambda *_args: True)
+    access.require_access(42)
+
+
+def test_beta_tester_can_enter_during_zbt(monkeypatch):
+    monkeypatch.setenv('ADMIN_IDS', '999')
+    monkeypatch.setenv('BETA_TESTER_IDS', '42')
+    monkeypatch.setenv('ZBT_ENABLED', 'true')
     monkeypatch.setattr(access, 'required_channel_subscription', lambda *_args: True)
     access.require_access(42)
